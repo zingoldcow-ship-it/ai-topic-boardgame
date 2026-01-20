@@ -49,21 +49,20 @@
       </div>
 
       <div class="card">
-        <div class="card__title">저장/복원</div>
+        <div class="card__title">저장</div>
         <div class="stack">
           <div class="row row--wrap">
-            <label class="check"><input id="autoSave" type="checkbox" /> 자동 저장</label>
-            <button id="exportJson" class="btn">데이터 내보내기(JSON)</button>
+            <button id="exportFile" class="btn">내 수업용 문제 파일 저장</button>
             <label class="btn filebtn">
-              JSON 가져오기
-              <input id="importJson" type="file" accept="application/json" />
+              문제 파일 불러오기
+              <input id="importFile" type="file" accept="application/json" />
             </label>
           </div>
           <div class="row">
             <button id="clearData" class="btn btn--danger">모든 데이터 삭제</button>
           </div>
           <div class="hint">
-            저장 항목: 주제/모델/문제 목록(cells) + 마지막 갱신시각. 각 사용자 브라우저에 개별 저장됩니다.
+            ‘문제 파일’에는 주제/모델/문제 목록이 함께 저장됩니다. (각 선생님 PC에서 따로 사용)
           </div>
         </div>
       </div>
@@ -99,7 +98,7 @@
         <div id="boardCenter" class="boardCenter" aria-hidden="true">
           <div class="centerText">
             <div class="centerText__title">주제형 문제 모드</div>
-            <div class="centerText__sub">설정(⚙️)에서 AI 생성 또는 오프라인 템플릿을 선택할 수 있습니다.</div>
+            <div class="centerText__sub">설정(⚙️)에서 Gemini 연결 후, 주제를 넣으면 문제가 자동으로 바뀝니다.</div>
           </div>
         </div>
       </div>
@@ -153,12 +152,15 @@
       <div class="card card--flat">
         <div class="card__title">AI 설정</div>
         <div class="stack">
-          <label class="label">생성 방식</label>
+          <label class="label">Gemini 연결 방식</label>
           <select id="aiMode" class="input">
-            <option value="offline">오프라인(템플릿)</option>
-            <option value="geminiProxy">Gemini (프록시/권장 · 키 노출 없음)</option>
-            <option value="geminiDirect">Gemini (브라우저 직접 호출 · 키 노출 위험)</option>
+            <option value="geminiDirect">API 키 입력(간단)</option>
+            <option value="geminiProxy">프록시 사용(권장 · 키 안전)</option>
           </select>
+          <div class="hint">
+            <b>API 키 입력(간단)</b>: 이 브라우저에 키를 저장하고 Gemini를 호출합니다. (키가 노출될 수 있음)<br/>
+            <b>프록시 사용(권장)</b>: 키를 프록시에 보관하고 브라우저에는 키가 내려오지 않습니다.
+          </div>
 
           <label class="label">모델</label>
           <select id="geminiModel" class="input">
@@ -169,16 +171,20 @@
 
           <label class="label">문제 수(말판 문제 칸 수와 자동 맞춤)</label>
           <input id="genCount" class="input" type="number" min="10" max="80" step="1" value="24" />
-          <div class="hint">오프라인/AI 모두 동일하게, 말판의 ‘문제 칸’ 개수에 맞춰 자동 조정됩니다.</div>
+          <div class="hint">말판의 ‘문제 칸’ 개수에 맞춰 자동 조정됩니다.</div>
 
           <div class="divider"></div>
 
-          <label class="label">Gemini API 키 (브라우저 직접 호출 모드에서만 필요)</label>
+          <label class="label">Gemini API 키</label>
           <input id="apiKeyInput" class="input" type="password" placeholder="예: AIza..." />
-          <div class="hint">※ GitHub Pages는 키를 완전히 숨길 수 없습니다. 노출을 막으려면 프록시(Worker) 모드를 사용하세요.</div>
+          <div class="row row--wrap">
+            <button id="getKeyBtn" class="btn btn--ghost" type="button">API 키 발급받기(구글)</button>
+          </div>
+          <div class="hint">※ GitHub Pages 정적 사이트에서는 키를 100% 숨길 수 없습니다. 완전한 보호가 필요하면 ‘프록시 사용(권장)’을 선택하세요.</div>
 
-          <label class="label">프록시 URL (권장)</label>
+          <label class="label">프록시 주소(권장)</label>
           <input id="proxyUrl" class="input" placeholder="예: https://your-worker.yourname.workers.dev" />
+          <div class="hint">프록시는 Cloudflare Workers 같은 무료 서비스로 만들 수 있습니다. (키를 프록시에 저장 → 브라우저에는 키 미노출)</div>
 
           <div class="row row--wrap">
             <button id="saveAi" class="btn btn--primary">설정 저장</button>
@@ -191,17 +197,18 @@
       <div class="card card--flat">
         <div class="card__title">사용 방법</div>
         <ol class="ol">
-          <li>주제 입력 → <b>문제 적용</b> (오프라인 템플릿 또는 AI로 문제 생성)</li>
+          <li>처음 한 번, 설정(⚙️)에서 <b>Gemini 연결</b>(API 키 또는 프록시)을 해주세요.</li>
+          <li>주제 입력 → <b>문제 적용</b> (해당 주제로 말판 문제가 자동 생성됩니다)</li>
           <li><b>게임 시작하기</b> 후, 2명이 번갈아 <b>주사위 굴리기</b></li>
           <li>정답은 <b>대소문자 무시</b>, 복수 정답은 <b>|</b> 로 구분</li>
-          <li><b>저장/복원</b>: 자동 저장 또는 JSON 내보내기/가져오기</li>
+          <li><b>저장/불러오기</b>: 왼쪽 ‘내 수업용 문제 파일 저장’으로 파일로 저장하고, ‘문제 파일 불러오기’로 다시 불러옵니다.</li>
         </ol>
       </div>
 
       <div class="card card--flat">
-        <div class="card__title">데이터 관리</div>
+        <div class="card__title">저장된 내용 미리보기(고급)</div>
         <div class="stack">
-          <div class="hint">아래는 앱이 localStorage에 저장하는 항목 미리보기입니다.</div>
+          <div class="hint">아래는 앱이 이 브라우저에 임시로 저장하는 항목 미리보기입니다. (수업용 사용에는 몰라도 됩니다)</div>
           <pre id="storagePreview" class="code"></pre>
         </div>
       </div>

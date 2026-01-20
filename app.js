@@ -20,9 +20,8 @@
     defaultTopic: '정선아리랑',
     model: 'gemini-1.5-flash',
     count: 22,
-    mode: 'offline', // offline | geminiDirect | geminiProxy
+    mode: 'geminiDirect', // geminiDirect | geminiProxy
     proxyUrl: '',
-    autoSave: true,
   };
 
   const els = {
@@ -63,10 +62,9 @@
     endModal: document.getElementById('endModal'),
     endContent: document.getElementById('endContent'),
 
-    // storage
-    autoSave: document.getElementById('autoSave'),
-    exportJson: document.getElementById('exportJson'),
-    importJson: document.getElementById('importJson'),
+    // storage (파일 저장/불러오기)
+    exportFile: document.getElementById('exportFile'),
+    importFile: document.getElementById('importFile'),
     clearData: document.getElementById('clearData'),
 
     // settings drawer
@@ -81,6 +79,8 @@
     genCount: document.getElementById('genCount'),
     proxyUrl: document.getElementById('proxyUrl'),
     apiKeyInput: document.getElementById('apiKeyInput'),
+    getKeyBtn: document.getElementById('getKeyBtn'),
+    getKeyBtn: document.getElementById('getKeyBtn'),
 
     storagePreview: document.getElementById('storagePreview'),
   };
@@ -489,7 +489,7 @@
     els.log.innerHTML = '';
     logLine(`게임 시작! 현재 차례 → ${players[turn].name}`);
     startTimer();
-    persistIfAutoSave();
+    persistState();
   }
 
   function resetGame() {
@@ -511,7 +511,7 @@
     els.log.innerHTML = '';
     logLine('리셋됨');
     showModal(els.endModal, false);
-    persistIfAutoSave();
+    persistState();
   }
 
   function finishGame() {
@@ -528,7 +528,7 @@
     els.endContent.textContent = msg;
     showModal(els.endModal, true);
     logLine(msg);
-    persistIfAutoSave();
+    persistState();
   }
 
   // ---------- AI generation (Gemini) ----------
@@ -536,8 +536,10 @@
   function loadAiConfig() {
     const raw = localStorage.getItem(STORAGE_KEYS.aiConfig);
     const cfg = raw ? safeJsonParse(raw) : null;
+    const rawMode = cfg?.mode ?? DEFAULTS.mode;
+    const mode = (rawMode === 'geminiProxy' || rawMode === 'geminiDirect') ? rawMode : DEFAULTS.mode;
     return {
-      mode: cfg?.mode ?? DEFAULTS.mode,
+      mode,
       model: cfg?.model ?? DEFAULTS.model,
       count: clamp(Number(cfg?.count ?? DEFAULTS.count), 8, 60),
       proxyUrl: cfg?.proxyUrl ?? DEFAULTS.proxyUrl,
@@ -642,9 +644,14 @@
     const layout = baseLayout(path.length);
     const slotCount = layout.filter((x) => x === null).length;
 
-    if (cfg.mode === 'offline') {
-      setPill(els.aiStatus, '모드: 오프라인(템플릿)', 'muted');
-      return buildCellsOffline(nextTopic, path.length);
+    // Gemini 연결 조건 확인
+    if (cfg.mode === 'geminiDirect' && !getGeminiKey()) {
+      refreshAiStatusPill();
+      throw new Error('Gemini API 키가 없습니다. 설정(⚙️)에서 API 키를 입력한 뒤 다시 시도하세요.');
+    }
+    if (cfg.mode === 'geminiProxy' && !String(cfg.proxyUrl || '').trim()) {
+      refreshAiStatusPill();
+      throw new Error('프록시 주소가 없습니다. 설정(⚙️)에서 프록시 주소를 입력한 뒤 다시 시도하세요.');
     }
 
     setPill(els.aiStatus, '모드: Gemini 생성 중…', 'muted');
@@ -696,8 +703,7 @@
     };
   }
 
-  function persistIfAutoSave() {
-    if (!els.autoSave.checked) return;
+  function persistState() {
     const state = buildAppState();
     localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
     refreshStoragePreview();
@@ -754,12 +760,6 @@
 
   function refreshAiStatusPill() {
     const cfg = loadAiConfig();
-    if (cfg.mode === 'offline') {
-      // 오프라인도 템플릿으로 "문제 생성"은 진행됩니다. AI가 아닌 것을 명확히 표기.
-      setPill(els.aiStatus, '모드: 오프라인(템플릿)', 'muted');
-      return;
-    }
-
     if (cfg.mode === 'geminiDirect') {
       const has = Boolean(getGeminiKey());
       setPill(els.aiStatus, has ? `모드: Gemini 직접 (${cfg.model})` : '모드: Gemini 직접 (키 필요)', has ? 'ok' : 'danger');
@@ -772,7 +772,8 @@
       return;
     }
 
-    setPill(els.aiStatus, '모드: 오프라인(템플릿)', 'muted');
+    // 알 수 없는 값이 저장된 경우 기본값으로 유도
+    setPill(els.aiStatus, '모드: Gemini 직접 (키 필요)', 'danger');
   }
 
   // ---------- Events ----------
@@ -794,7 +795,7 @@
 
       // 게임은 중간에 바뀌면 혼란이 커서 리셋
       resetGame();
-      persistIfAutoSave();
+      persistState();
 
       logLine(`주제 적용: ${topic}`);
     } catch (e) {
@@ -815,7 +816,7 @@
       logLine(`${p.name} 쉬는 턴`);
       p.skip = false;
       nextTurn();
-      persistIfAutoSave();
+      persistState();
       return;
     }
 
@@ -823,7 +824,7 @@
     await animateRoll(n);
     els.diceResult.textContent = `주사위: ${n}`;
     movePlayer(p, n);
-    persistIfAutoSave();
+    persistState();
   }
 
   function onSubmitAnswer() {
@@ -845,7 +846,7 @@
     setTimeout(() => {
       showModal(els.resultModal, false);
       nextTurn();
-      persistIfAutoSave();
+      persistState();
     }, 1500);
   }
 
@@ -861,13 +862,31 @@
     }
   }
 
+  function updateModeUi() {
+    const mode = els.aiMode.value;
+    const direct = mode === 'geminiDirect';
+    // direct: key enabled, proxy disabled
+    els.apiKeyInput.disabled = !direct;
+    if (els.getKeyBtn) els.getKeyBtn.disabled = !direct;
+    els.proxyUrl.disabled = direct;
+  }
+
   function syncSettingsUIFromStorage() {
     const cfg = loadAiConfig();
     els.aiMode.value = cfg.mode;
     els.geminiModel.value = cfg.model;
     els.genCount.value = String(cfg.count);
     els.proxyUrl.value = cfg.proxyUrl;
+
+    updateModeUi();
+
+    els.aiMode.addEventListener('change', () => {
+      updateModeUi();
+      refreshAiStatusPill();
+    });
     els.apiKeyInput.value = getGeminiKey();
+
+    updateModeUi();
 
     refreshAiStatusPill();
   }
@@ -886,7 +905,7 @@
     if (key) setGeminiKey(key);
 
     refreshAiStatusPill();
-    persistIfAutoSave();
+    persistState();
     alert('AI 설정이 저장되었습니다.');
   }
 
@@ -894,7 +913,7 @@
     deleteGeminiKey();
     els.apiKeyInput.value = '';
     refreshAiStatusPill();
-    persistIfAutoSave();
+    persistState();
     alert('API 키를 삭제했습니다.');
   }
 
@@ -908,11 +927,6 @@
 
     const tryTopic = '테스트(과학)';
     try {
-      if (cfg.mode === 'offline') {
-        alert('오프라인 모드는 연결 테스트가 필요 없습니다.');
-        return;
-      }
-
       if (cfg.mode === 'geminiDirect') {
         if (els.apiKeyInput.value.trim()) setGeminiKey(els.apiKeyInput.value.trim());
         const qs = await geminiGenerateDirect({ topic: tryTopic, model: cfg.model, count: 8 });
@@ -933,29 +947,30 @@
     }
   }
 
-  function onExportJson() {
+  function onExportFile() {
     const state = buildAppState();
-    const filename = `topic-boardgame_${state.topic}_${new Date().toISOString().slice(0,10)}.json`;
+    const safeTopic = String(state.topic || 'topic').replace(/[^a-zA-Z0-9가-힣 _-]/g, '').slice(0, 24) || 'topic';
+    const filename = `내수업_문제파일_${safeTopic}_${new Date().toISOString().slice(0,10)}.json`;
     downloadText(filename, JSON.stringify(state, null, 2));
   }
 
-  function onImportJson(file) {
+  function onImportFile(file) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || '');
       const state = safeJsonParse(text);
       if (!state || typeof state !== 'object') {
-        alert('올바른 JSON 파일이 아닙니다.');
+        alert('올바른 문제 파일이 아닙니다.');
         return;
       }
       if (!Array.isArray(state.cells) || state.cells.length !== path.length) {
-        alert('이 앱의 데이터 형식이 아니거나, 말판 길이가 다릅니다.');
+        alert('이 앱의 문제 파일이 아니거나, 말판 형식이 다릅니다.');
         return;
       }
       localStorage.setItem(STORAGE_KEYS.state, JSON.stringify(state));
       applyState(state);
-      alert('가져오기 완료');
+      alert('불러오기 완료');
     };
     reader.readAsText(file, 'utf-8');
   }
@@ -972,13 +987,13 @@
     topic = DEFAULTS.defaultTopic;
     els.topicInput.value = topic;
 
-    // offline default cells
+    // 기본 샘플 문제(처음 화면용)
     cells = buildCellsOffline(topic, path.length);
     renderTileLabels(cells);
 
     resetGame();
     refreshAiStatusPill();
-    setPill(els.cellsStatus, '문제: 기본 세트', 'muted');
+    setPill(els.cellsStatus, '문제: 샘플(기본)', 'muted');
     refreshStoragePreview();
 
     alert('삭제 완료');
@@ -993,28 +1008,26 @@
 
     // load saved AI config into UI defaults
     const cfg = loadAiConfig();
-    els.autoSave.checked = DEFAULTS.autoSave;
 
-    // start with offline cells; then apply saved state if present
+    // start with 샘플 문제; then apply saved state if present
     cells = buildCellsOffline(DEFAULTS.defaultTopic, path.length);
     renderTileLabels(cells);
     placeTokens();
     updScores();
     setTimerText();
     refreshAiStatusPill();
-    setPill(els.cellsStatus, '문제: 기본 세트', 'muted');
+    setPill(els.cellsStatus, '문제: 샘플(기본)', 'muted');
 
     // load saved state
     const saved = loadSavedState();
     if (saved) {
-      els.autoSave.checked = true;
       applyState(saved);
       logLine('저장된 상태를 불러왔습니다.');
     } else {
       // seed state so export works immediately
       topic = DEFAULTS.defaultTopic;
       els.topicInput.value = topic;
-      persistIfAutoSave();
+      persistState();
     }
 
     // bind events
@@ -1027,9 +1040,8 @@
     els.qModal.addEventListener('click', (e) => { if (e.target === els.qModal) showModal(els.qModal, false); });
     els.endModal.addEventListener('click', (e) => { if (e.target === els.endModal) showModal(els.endModal, false); });
 
-    els.autoSave.addEventListener('change', () => persistIfAutoSave());
-    els.exportJson.addEventListener('click', onExportJson);
-    els.importJson.addEventListener('change', (e) => { onImportJson(e.target.files?.[0]); e.target.value=''; });
+    els.exportFile.addEventListener('click', onExportFile);
+    els.importFile.addEventListener('change', (e) => { onImportFile(e.target.files?.[0]); e.target.value=''; });
     els.clearData.addEventListener('click', onClearData);
 
     els.openSettings.addEventListener('click', () => openDrawer(true));
@@ -1041,6 +1053,9 @@
     els.saveAi.addEventListener('click', onSaveAi);
     els.deleteKey.addEventListener('click', onDeleteKey);
     els.testAi.addEventListener('click', onTestAi);
+    els.getKeyBtn.addEventListener('click', () => {
+      window.open('https://aistudio.google.com/app/apikey', '_blank', 'noopener,noreferrer');
+    });
 
     // reflect saved AI config (even if no game state)
     els.aiMode.value = cfg.mode;
