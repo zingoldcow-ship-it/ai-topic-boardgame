@@ -20,6 +20,7 @@
   </header>
 
   <main class="page">
+    <div class="layout">
     <section class="panel">
       <div class="card">
         <div class="card__title">게임 시작</div>
@@ -103,6 +104,7 @@
         </div>
       </div>
     </section>
+    </div>
   </main>
 
   <!-- Question Modal -->
@@ -136,95 +138,71 @@
     </div>
   </div>
 
-  <!-- Settings Drawer -->
-  <div id="settingsOverlay" class="overlay" aria-hidden="true">
-    <aside id="settings" class="drawer" role="dialog" aria-modal="true" aria-label="설정">
-      <div class="drawer__head">
+  <!-- Settings Drawer (JS/CSS와 id/class 일치) -->
+  <div id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer__backdrop" aria-hidden="true"></div>
+    <aside class="drawer__panel" role="dialog" aria-modal="true" aria-label="설정">
+      <div class="drawer__header">
         <div>
           <div class="drawer__title">설정</div>
-          <div class="drawer__sub">AI 설정 · 데이터 관리 · 사용 방법</div>
+          <div class="hint">AI 설정 · 데이터 관리 · 사용 방법</div>
         </div>
         <button id="closeSettings" class="iconbtn" title="닫기">✕</button>
       </div>
 
-      <div class="drawer__body">
-        <div class="card card--flat">
-          <div class="card__title">AI 설정</div>
-          <div class="stack">
-            <div class="row row--wrap">
-              <div class="pill" id="apiKeyBadge">API 키 상태: 미설정</div>
-              <div class="pill" id="proxyBadge">프록시: 미설정</div>
-            </div>
+      <div class="card card--flat">
+        <div class="card__title">AI 설정</div>
+        <div class="stack">
+          <label class="label">생성 방식</label>
+          <select id="aiMode" class="input">
+            <option value="offline">오프라인(템플릿)</option>
+            <option value="geminiProxy">Gemini (프록시/권장 · 키 노출 없음)</option>
+            <option value="geminiDirect">Gemini (브라우저 직접 호출 · 키 노출 위험)</option>
+          </select>
 
-            <label class="label">생성 방식</label>
-            <select id="genMode" class="input">
-              <option value="offline">오프라인(템플릿)</option>
-              <option value="gemini_proxy">Gemini (프록시/권장)</option>
-              <option value="gemini_browser">Gemini (브라우저 직접 호출/키 노출 위험)</option>
-            </select>
+          <label class="label">모델</label>
+          <select id="geminiModel" class="input">
+            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+          </select>
 
-            <label class="label">모델</label>
-            <select id="modelSelect" class="input">
-              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-            </select>
+          <label class="label">문제 수(말판 문제 칸 수와 자동 맞춤)</label>
+          <input id="genCount" class="input" type="number" min="10" max="80" step="1" value="24" />
+          <div class="hint">오프라인/AI 모두 동일하게, 말판의 ‘문제 칸’ 개수에 맞춰 자동 조정됩니다.</div>
 
-            <label class="label">문제 수(말판 문제 칸 수와 자동 맞춤)</label>
-            <input id="questionCount" class="input" type="number" min="10" max="80" step="1" value="24" />
-            <div class="hint">실제 사용 시, 말판의 ‘문제 칸’ 개수에 맞춰 자동으로 조정됩니다.</div>
+          <div class="divider"></div>
 
-            <div class="divider"></div>
+          <label class="label">Gemini API 키 (브라우저 직접 호출 모드에서만 필요)</label>
+          <input id="apiKeyInput" class="input" type="password" placeholder="예: AIza..." />
+          <div class="hint">※ GitHub Pages는 키를 완전히 숨길 수 없습니다. 노출을 막으려면 프록시(Worker) 모드를 사용하세요.</div>
 
-            <label class="label">Gemini API 키 (로컬 저장)</label>
-            <input id="apiKeyInput" class="input" type="password" placeholder="(브라우저 직접 호출 모드에서만 필요)" />
-            <div class="row">
-              <button id="saveKey" class="btn">키 저장</button>
-              <button id="deleteKey" class="btn btn--danger">키 삭제</button>
-            </div>
-            <div class="hint">
-              GitHub Pages 같은 정적 사이트는 키를 서버에서 숨길 수 없습니다. 키 노출을 막으려면 아래의 “프록시 URL” 방식(Cloudflare Worker)을 사용하세요.
-            </div>
+          <label class="label">프록시 URL (권장)</label>
+          <input id="proxyUrl" class="input" placeholder="예: https://your-worker.yourname.workers.dev" />
 
-            <label class="label">프록시 URL (권장)</label>
-            <input id="proxyUrl" class="input" placeholder="예: https://your-worker.yourname.workers.dev" />
-            <div class="row">
-              <button id="saveProxy" class="btn">프록시 저장</button>
-              <button id="deleteProxy" class="btn btn--danger">프록시 삭제</button>
-            </div>
-            <div class="hint">
-              프록시는 서버(Worker)에만 키를 저장하고, 브라우저에는 키를 두지 않습니다. 무료로 구성 가능.
-            </div>
-
-            <div class="row">
-              <button id="testAi" class="btn btn--ghost">AI 연결 테스트</button>
-            </div>
+          <div class="row row--wrap">
+            <button id="saveAi" class="btn btn--primary">설정 저장</button>
+            <button id="deleteKey" class="btn btn--danger">API 키 삭제</button>
+            <button id="testAi" class="btn btn--ghost">AI 연결 테스트</button>
           </div>
         </div>
+      </div>
 
-        <div class="card card--flat">
-          <div class="card__title">사용 방법</div>
-          <ol class="ol">
-            <li>주제 입력 → <b>문제 적용</b> → 말판 문제가 교체됩니다.</li>
-            <li><b>게임 시작하기</b> 후, 2명이 번갈아 <b>주사위 굴리기</b>.</li>
-            <li>문제는 정답(대소문자 무시/복수정답 가능: |로 구분) 기준으로 채점합니다.</li>
-            <li><b>저장/복원</b>: 자동 저장 또는 JSON 내보내기/가져오기.</li>
-          </ol>
-          <details class="details">
-            <summary>Gemini API 키 “도메인 제한(HTTP referrer)” 안내</summary>
-            <div class="hint">
-              브라우저 직접 호출을 사용할 경우, Google AI Studio/Cloud Console에서 API 키에 <b>HTTP referrers</b> 제한을 걸어
-              “내 GitHub Pages 도메인에서만” 동작하도록 설정하면 악용 위험을 줄일 수 있습니다.
-            </div>
-          </details>
-        </div>
+      <div class="card card--flat">
+        <div class="card__title">사용 방법</div>
+        <ol class="ol">
+          <li>주제 입력 → <b>문제 적용</b> (오프라인 템플릿 또는 AI로 문제 생성)</li>
+          <li><b>게임 시작하기</b> 후, 2명이 번갈아 <b>주사위 굴리기</b></li>
+          <li>정답은 <b>대소문자 무시</b>, 복수 정답은 <b>|</b> 로 구분</li>
+          <li><b>저장/복원</b>: 자동 저장 또는 JSON 내보내기/가져오기</li>
+        </ol>
+      </div>
 
-        <div class="card card--flat">
-          <div class="card__title">데이터 관리</div>
-          <div class="stack">
-            <div class="hint">아래는 앱이 localStorage에 저장하는 항목입니다.</div>
-            <pre id="storagePreview" class="code"></pre>
-          </div>
+      <div class="card card--flat">
+        <div class="card__title">데이터 관리</div>
+        <div class="stack">
+          <div class="hint">아래는 앱이 localStorage에 저장하는 항목 미리보기입니다.</div>
+          <pre id="storagePreview" class="code"></pre>
         </div>
       </div>
     </aside>

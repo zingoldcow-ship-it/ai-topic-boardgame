@@ -144,13 +144,20 @@
 
   function dieSVG(n) {
     const d = (x, y) => `<circle cx='${x}' cy='${y}' r='9' fill='#2c3e50'/>`;
+    // (버그 수정) 5는 가운데 포함, 6은 가운데 없이 6개만.
     const f = [
+      // 1
       d(50, 50),
+      // 2
       d(30, 30) + d(70, 70),
+      // 3
       d(30, 30) + d(50, 50) + d(70, 70),
+      // 4
       d(30, 30) + d(70, 30) + d(30, 70) + d(70, 70),
+      // 5
+      d(30, 30) + d(70, 30) + d(50, 50) + d(30, 70) + d(70, 70),
+      // 6
       d(30, 30) + d(70, 30) + d(30, 50) + d(70, 50) + d(30, 70) + d(70, 70),
-      d(30, 30) + d(70, 30) + d(30, 50) + d(70, 50) + d(30, 70) + d(70, 70) + d(50, 50),
     ];
     return `<svg viewBox='0 0 100 100'><rect x='5' y='5' width='90' height='90' rx='14' ry='14'
       fill='#fff' stroke='#2c3e50' stroke-width='7'/>${f[n - 1]}</svg>`;
@@ -636,11 +643,11 @@
     const slotCount = layout.filter((x) => x === null).length;
 
     if (cfg.mode === 'offline') {
-      setPill(els.aiStatus, 'AI: 미사용', 'muted');
+      setPill(els.aiStatus, '모드: 오프라인(템플릿)', 'muted');
       return buildCellsOffline(nextTopic, path.length);
     }
 
-    setPill(els.aiStatus, 'AI: 생성 중…', 'muted');
+    setPill(els.aiStatus, '모드: Gemini 생성 중…', 'muted');
 
     const desired = clamp(Number(cfg.count || slotCount), 8, 60);
     const count = Math.max(slotCount, desired);
@@ -660,7 +667,7 @@
     }
 
     const merged = mergeQuestionsIntoLayout(layout, questions);
-    setPill(els.aiStatus, `AI: 사용 (${cfg.model})`, 'ok');
+    setPill(els.aiStatus, `모드: Gemini 사용 (${cfg.model})`, 'ok');
     return merged;
   }
 
@@ -748,23 +755,24 @@
   function refreshAiStatusPill() {
     const cfg = loadAiConfig();
     if (cfg.mode === 'offline') {
-      setPill(els.aiStatus, 'AI: 미사용', 'muted');
+      // 오프라인도 템플릿으로 "문제 생성"은 진행됩니다. AI가 아닌 것을 명확히 표기.
+      setPill(els.aiStatus, '모드: 오프라인(템플릿)', 'muted');
       return;
     }
 
     if (cfg.mode === 'geminiDirect') {
       const has = Boolean(getGeminiKey());
-      setPill(els.aiStatus, has ? `AI: 직접 (${cfg.model})` : 'AI: 직접 (키 필요)', has ? 'ok' : 'danger');
+      setPill(els.aiStatus, has ? `모드: Gemini 직접 (${cfg.model})` : '모드: Gemini 직접 (키 필요)', has ? 'ok' : 'danger');
       return;
     }
 
     if (cfg.mode === 'geminiProxy') {
       const has = Boolean(cfg.proxyUrl);
-      setPill(els.aiStatus, has ? `AI: 프록시 (${cfg.model})` : 'AI: 프록시 (URL 필요)', has ? 'ok' : 'danger');
+      setPill(els.aiStatus, has ? `모드: Gemini 프록시 (${cfg.model})` : '모드: Gemini 프록시 (URL 필요)', has ? 'ok' : 'danger');
       return;
     }
 
-    setPill(els.aiStatus, 'AI: 미사용', 'muted');
+    setPill(els.aiStatus, '모드: 오프라인(템플릿)', 'muted');
   }
 
   // ---------- Events ----------
