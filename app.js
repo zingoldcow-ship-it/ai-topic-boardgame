@@ -18,10 +18,8 @@
     rows: 6,
     gameSeconds: 420,
     defaultTopic: '정선아리랑',
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     count: 22,
-    mode: 'geminiDirect', // geminiDirect | geminiProxy
-    proxyUrl: '',
   };
 
   const els = {
@@ -74,12 +72,9 @@
     deleteKey: document.getElementById('deleteKey'),
     testAi: document.getElementById('testAi'),
 
-    aiMode: document.getElementById('aiMode'),
     geminiModel: document.getElementById('geminiModel'),
     genCount: document.getElementById('genCount'),
-    proxyUrl: document.getElementById('proxyUrl'),
     apiKeyInput: document.getElementById('apiKeyInput'),
-    getKeyBtn: document.getElementById('getKeyBtn'),
     getKeyBtn: document.getElementById('getKeyBtn'),
 
     storagePreview: document.getElementById('storagePreview'),
@@ -536,13 +531,9 @@
   function loadAiConfig() {
     const raw = localStorage.getItem(STORAGE_KEYS.aiConfig);
     const cfg = raw ? safeJsonParse(raw) : null;
-    const rawMode = cfg?.mode ?? DEFAULTS.mode;
-    const mode = (rawMode === 'geminiProxy' || rawMode === 'geminiDirect') ? rawMode : DEFAULTS.mode;
     return {
-      mode,
       model: cfg?.model ?? DEFAULTS.model,
       count: clamp(Number(cfg?.count ?? DEFAULTS.count), 8, 60),
-      proxyUrl: cfg?.proxyUrl ?? DEFAULTS.proxyUrl,
     };
   }
 
@@ -564,6 +555,62 @@
 
   function aiPromptFor(topic, count) {
     return `너는 초등 5~6학년 수업용 퀴즈 제작자다.\n\n[주제]\n${topic}\n\n[요구]\n- 총 ${count}개 문제를 만들어라.\n- 반드시 JSON 배열로만 출력하라(설명/코드블록/마크다운 금지).\n- 각 원소는 다음 스키마를 따른다: {"label":"짧은라벨","q":"문제","a":"정답"}\n- label: 2~8글자, 문제 유형이 드러나게(예: 개념,OX,예시,용어,적용 등)\n- q: 한 문장 중심(최대 60자), 초등학생이 이해 가능\n- a: 짧게. 복수정답은 '|'로 구분(예: "미|밀")\n- OX 문제는 a를 "O" 또는 "X"로\n- 외부 링크/이미지는 넣지 마라(img는 사용하지 않음).\n\n[JSON만 출력]`;
+  }
+
+  async function listGeminiModels(apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(url);
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg = data?.error?.message || JSON.stringify(data);
+      throw new Error(msg);
+    }
+
+    const items = Array.isArray(data?.models) ? data.models : [];
+    const supports = items
+      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+      .map((m) => String(m.name || '').replace(/^models\//, ''))
+      .filter(Boolean);
+
+    // preference order (있으면 앞으로)
+    const prefer = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-2.0-pro'];
+    supports.sort((a, b) => {
+      const ia = prefer.indexOf(a);
+      const ib = prefer.indexOf(b);
+      const pa = ia === -1 ? 999 : ia;
+      const pb = ib === -1 ? 999 : ib;
+      if (pa !== pb) return pa - pb;
+      return a.localeCompare(b);
+    });
+    return supports;
+  }
+
+  function setModelOptions(models) {
+    if (!els.geminiModel) return;
+    const current = els.geminiModel.value;
+    els.geminiModel.innerHTML = '';
+    (models || []).slice(0, 30).forEach((m) => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      els.geminiModel.appendChild(opt);
+    });
+    if (models.includes(current)) els.geminiModel.value = current;
+    else if (models[0]) els.geminiModel.value = models[0];
+  }
+
+  function friendlyGeminiError(msg) {
+    const m = String(msg || '');
+    if (/overloaded/i.test(m)) {
+      return 'Gemini 서버가 혼잡합니다. 잠시 후 다시 시도해 주세요.';
+    }
+    if (/quota|rate|limit: 0|resourceexhausted/i.test(m)) {
+      return 'Gemini 사용 한도가 부족하거나(또는 0으로 설정) 현재 요청이 차단되었습니다.\n\n확인 방법:\n1) AI Studio에서 해당 API 키 프로젝트의 Quota/Rate limit 상태 확인\n2) 무료 할당량이 0이면 결제(빌링) 연결 후 다시 시도\n3) 잠시 후 재시도(429)';
+    }
+    if (/not found for api version|not supported/i.test(m)) {
+      return '선택한 모델이 현재 API 키에서 사용 불가합니다.\n\n해결: 설정(⚙️) → AI 연결 테스트 → 모델 목록 자동 갱신 후 다시 시도해 주세요.';
+    }
+    return `Gemini 오류: ${m}`;
   }
 
   async function geminiGenerateDirect({ topic, model, count }) {
@@ -593,35 +640,16 @@
       body: JSON.stringify(body),
     });
 
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       const msg = data?.error?.message || JSON.stringify(data);
-      throw new Error(`Gemini 오류: ${msg}`);
+      throw new Error(msg);
     }
 
     const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('') || '';
     const parsed = safeJsonParse(text);
     if (!Array.isArray(parsed)) throw new Error('AI 응답을 JSON 배열로 파싱하지 못했습니다.');
     return parsed;
-  }
-
-  async function geminiGenerateViaProxy({ topic, model, count, proxyUrl }) {
-    if (!proxyUrl) throw new Error('프록시 URL이 없습니다. (설정에서 입력)');
-
-    const url = proxyUrl.replace(/\/$/, '') + '/generate';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, model, count }),
-    });
-
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(data?.error || `프록시 오류 (HTTP ${resp.status})`);
-    }
-
-    if (!Array.isArray(data?.questions)) throw new Error('프록시 응답이 올바르지 않습니다.');
-    return data.questions;
   }
 
   function sanitizeQuestions(items) {
@@ -637,21 +665,16 @@
     return out;
   }
 
-  async function buildCellsWithAiOrOffline(nextTopic) {
+  async function buildCellsWithAi(nextTopic) {
     const cfg = loadAiConfig();
 
     // slots count equals number of nulls in base layout
     const layout = baseLayout(path.length);
     const slotCount = layout.filter((x) => x === null).length;
 
-    // Gemini 연결 조건 확인
-    if (cfg.mode === 'geminiDirect' && !getGeminiKey()) {
+    if (!getGeminiKey()) {
       refreshAiStatusPill();
       throw new Error('Gemini API 키가 없습니다. 설정(⚙️)에서 API 키를 입력한 뒤 다시 시도하세요.');
-    }
-    if (cfg.mode === 'geminiProxy' && !String(cfg.proxyUrl || '').trim()) {
-      refreshAiStatusPill();
-      throw new Error('프록시 주소가 없습니다. 설정(⚙️)에서 프록시 주소를 입력한 뒤 다시 시도하세요.');
     }
 
     setPill(els.aiStatus, '모드: Gemini 생성 중…', 'muted');
@@ -660,12 +683,25 @@
     const count = Math.max(slotCount, desired);
 
     let raw;
-    if (cfg.mode === 'geminiDirect') {
+    try {
       raw = await geminiGenerateDirect({ topic: nextTopic, model: cfg.model, count });
-    } else if (cfg.mode === 'geminiProxy') {
-      raw = await geminiGenerateViaProxy({ topic: nextTopic, model: cfg.model, count, proxyUrl: cfg.proxyUrl });
-    } else {
-      throw new Error('알 수 없는 AI 모드');
+    } catch (e) {
+      // 모델 불일치/변경 가능성: 한 번 모델 목록을 새로 불러오고 재시도
+      const msg = String(e?.message || e);
+      if (/not found for api version|not supported/i.test(msg)) {
+        const apiKey = getGeminiKey();
+        const models = await listGeminiModels(apiKey);
+        if (models.length) {
+          setModelOptions(models);
+          cfg.model = els.geminiModel.value;
+          saveAiConfig(cfg);
+          raw = await geminiGenerateDirect({ topic: nextTopic, model: cfg.model, count });
+        } else {
+          throw e;
+        }
+      } else {
+        throw e;
+      }
     }
 
     const questions = sanitizeQuestions(raw);
@@ -674,7 +710,7 @@
     }
 
     const merged = mergeQuestionsIntoLayout(layout, questions);
-    setPill(els.aiStatus, `모드: Gemini 사용 (${cfg.model})`, 'ok');
+    setPill(els.aiStatus, `AI: Gemini 사용 (${cfg.model})`, 'ok');
     return merged;
   }
 
@@ -694,10 +730,8 @@
         players: players.map((p) => ({ name: p.name, cls: p.cls, pos: p.pos, score: p.score, skip: p.skip })),
       },
       ai: {
-        mode: cfg.mode,
         model: cfg.model,
         count: cfg.count,
-        proxyUrl: cfg.proxyUrl,
         hasLocalKey: Boolean(getGeminiKey()),
       },
     };
@@ -760,20 +794,8 @@
 
   function refreshAiStatusPill() {
     const cfg = loadAiConfig();
-    if (cfg.mode === 'geminiDirect') {
-      const has = Boolean(getGeminiKey());
-      setPill(els.aiStatus, has ? `모드: Gemini 직접 (${cfg.model})` : '모드: Gemini 직접 (키 필요)', has ? 'ok' : 'danger');
-      return;
-    }
-
-    if (cfg.mode === 'geminiProxy') {
-      const has = Boolean(cfg.proxyUrl);
-      setPill(els.aiStatus, has ? `모드: Gemini 프록시 (${cfg.model})` : '모드: Gemini 프록시 (URL 필요)', has ? 'ok' : 'danger');
-      return;
-    }
-
-    // 알 수 없는 값이 저장된 경우 기본값으로 유도
-    setPill(els.aiStatus, '모드: Gemini 직접 (키 필요)', 'danger');
+    const has = Boolean(getGeminiKey());
+    setPill(els.aiStatus, has ? `AI: Gemini 사용 (${cfg.model})` : 'AI: 미설정(키 필요)', has ? 'ok' : 'danger');
   }
 
   // ---------- Events ----------
@@ -787,7 +809,7 @@
 
     try {
       topic = nextTopic;
-      const nextCells = await buildCellsWithAiOrOffline(topic);
+      const nextCells = await buildCellsWithAi(topic);
       cells = nextCells;
       renderTileLabels(cells);
 
@@ -800,7 +822,7 @@
       logLine(`주제 적용: ${topic}`);
     } catch (e) {
       console.error(e);
-      alert(e?.message || String(e));
+      alert(friendlyGeminiError(e?.message || String(e)));
       refreshAiStatusPill();
     } finally {
       els.applyTopic.disabled = false;
@@ -862,41 +884,18 @@
     }
   }
 
-  function updateModeUi() {
-    const mode = els.aiMode.value;
-    const direct = mode === 'geminiDirect';
-    // direct: key enabled, proxy disabled
-    els.apiKeyInput.disabled = !direct;
-    if (els.getKeyBtn) els.getKeyBtn.disabled = !direct;
-    els.proxyUrl.disabled = direct;
-  }
-
   function syncSettingsUIFromStorage() {
     const cfg = loadAiConfig();
-    els.aiMode.value = cfg.mode;
     els.geminiModel.value = cfg.model;
     els.genCount.value = String(cfg.count);
-    els.proxyUrl.value = cfg.proxyUrl;
-
-    updateModeUi();
-
-    els.aiMode.addEventListener('change', () => {
-      updateModeUi();
-      refreshAiStatusPill();
-    });
     els.apiKeyInput.value = getGeminiKey();
-
-    updateModeUi();
-
     refreshAiStatusPill();
   }
 
   function onSaveAi() {
     const cfg = {
-      mode: els.aiMode.value,
       model: els.geminiModel.value,
       count: clamp(Number(els.genCount.value || DEFAULTS.count), 8, 60),
-      proxyUrl: els.proxyUrl.value.trim(),
     };
 
     saveAiConfig(cfg);
@@ -918,32 +917,27 @@
   }
 
   async function onTestAi() {
-    const cfg = {
-      mode: els.aiMode.value,
-      model: els.geminiModel.value,
-      count: clamp(Number(els.genCount.value || DEFAULTS.count), 8, 60),
-      proxyUrl: els.proxyUrl.value.trim(),
-    };
-
     const tryTopic = '테스트(과학)';
     try {
-      if (cfg.mode === 'geminiDirect') {
-        if (els.apiKeyInput.value.trim()) setGeminiKey(els.apiKeyInput.value.trim());
-        const qs = await geminiGenerateDirect({ topic: tryTopic, model: cfg.model, count: 8 });
-        alert(`성공: ${Array.isArray(qs) ? qs.length : 0}개 문제 생성`);
+      const key = els.apiKeyInput.value.trim();
+      if (key) setGeminiKey(key);
+      if (!getGeminiKey()) {
+        alert('API 키가 없습니다. 먼저 API 키를 입력해 주세요.');
         return;
       }
 
-      if (cfg.mode === 'geminiProxy') {
-        const qs = await geminiGenerateViaProxy({ topic: tryTopic, model: cfg.model, count: 8, proxyUrl: cfg.proxyUrl });
-        alert(`성공: ${Array.isArray(qs) ? qs.length : 0}개 문제 생성`);
-        return;
-      }
+      // 1) 모델 목록 새로고침 (키마다 다를 수 있음)
+      const models = await listGeminiModels(getGeminiKey());
+      if (models.length) setModelOptions(models);
 
-      alert('알 수 없는 AI 모드');
+      // 2) 간단 생성 테스트
+      const cfg = loadAiConfig();
+      const model = els.geminiModel.value || cfg.model;
+      const qs = await geminiGenerateDirect({ topic: tryTopic, model, count: 6 });
+      alert(`성공: ${Array.isArray(qs) ? qs.length : 0}개 문제 생성\n(모델: ${model})`);
     } catch (e) {
       console.error(e);
-      alert(e?.message || String(e));
+      alert(friendlyGeminiError(e?.message || String(e)));
     }
   }
 
@@ -1058,10 +1052,8 @@
     });
 
     // reflect saved AI config (even if no game state)
-    els.aiMode.value = cfg.mode;
     els.geminiModel.value = cfg.model;
     els.genCount.value = String(cfg.count);
-    els.proxyUrl.value = cfg.proxyUrl;
 
     refreshStoragePreview();
   }
