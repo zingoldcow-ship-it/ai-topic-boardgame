@@ -196,6 +196,19 @@
     </div>
   </div>
 
-  <script src="./app.7901a53c.js"></script>
+  <script src="./app.js?v=20260121034027"></script>
+
+<script>
+  // Sanity check: if app.js not loaded, show a clear message.
+  setTimeout(() => {
+    if (!window.__APP_INIT_OK__) {
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;background:#fff3cd;border:1px solid #ffeeba;padding:12px 14px;border-radius:12px;font-weight:700;color:#664d03;box-shadow:0 10px 30px rgba(0,0,0,.12)';
+      box.innerHTML = '⚠️ 앱 스크립트(app.js)를 불러오지 못했습니다. <br/>GitHub Pages가 <b>main / (root)</b>에서 배포 중인지, 그리고 <b>teacher.html / student.html / app.js</b>가 같은 폴더(루트)에 업로드되어 있는지 확인하세요.';
+      document.body.appendChild(box);
+    }
+  }, 800);
+</script>
+
 </body>
 </html>

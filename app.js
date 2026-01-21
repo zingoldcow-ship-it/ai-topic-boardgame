@@ -1,5 +1,6 @@
 
 (() => {
+  window.__APP_INIT_OK__ = true;
   'use strict';
 
   const MODE = document.body?.dataset?.mode || 'student'; // teacher | student
@@ -567,6 +568,7 @@
     state.remaining = DEFAULTS.gameSeconds;
     setTimer();
     state.timerId = setInterval(() => {
+  window.__APP_INIT_OK__ = true;
       state.remaining -= 1;
       setTimer();
       if (state.remaining <= 0) {
