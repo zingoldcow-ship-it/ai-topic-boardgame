@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>교사용 - 주제형 한바퀴 보드게임</title>
   <link rel="stylesheet" href="./styles.css" />
+  <!-- Firebase (실시간 공유) / QR 코드 -->
+  <script src="./firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body data-mode="teacher">
   <div class="container">
@@ -78,6 +83,22 @@
         </div>
 
         <div class="card" style="margin-top:14px;">
+          <h2>수업 공유 (QR / 6자리 코드)</h2>
+          <div class="help" style="margin-top:6px;">
+            학생은 <b>학생용</b>에서 6자리 코드를 입력하거나, 아래 QR을 찍으면 바로 접속합니다.
+          </div>
+
+          <div class="row" style="align-items:center; gap:10px; margin-top:10px;">
+            <div class="badge" id="roomCodeBadge" style="min-width:160px; text-align:center;">
+              수업 코드: <b class="mono" id="roomCodeText">------</b>
+            </div>
+            <button class="btn" id="makeRoom">수업 코드 생성</button>
+            <button class="btn" id="showRoomQr" disabled>QR 보기</button>
+            <button class="btn" id="copyRoomLink" disabled>링크 복사</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
           <h2>진행상황</h2>
           <div class="log" id="log"></div>
         </div>
@@ -100,6 +121,25 @@
 
         <div class="boardWrap">
           <div class="board" id="board" aria-label="board"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR 모달 -->
+  <div class="overlay" id="roomQrOverlay" style="display:none;">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="modalTitle">학생용 접속 QR</div>
+        <button class="btn small" id="closeRoomQr">닫기</button>
+      </div>
+      <div class="modalBody" style="text-align:center;">
+        <canvas id="roomQrCanvas" width="220" height="220"></canvas>
+        <div style="margin-top:10px;">
+          수업 코드: <b class="mono" id="roomQrCodeText">------</b>
+        </div>
+        <div class="help" style="margin-top:6px;">
+          학생은 QR을 찍거나, 학생용에서 6자리 코드를 입력하면 됩니다.
         </div>
       </div>
     </div>
@@ -218,5 +258,22 @@
   <script src="./gate.js"></script>
   <script>TeacherGate.requireAuthOnTeacherPage({homeUrl:"./index.html"});</script>
   <script src="./app.js"></script>
+
+  <!-- QR 모달 -->
+  <div class="overlay" id="qrOverlay" style="display:none;">
+    <div class="modal" style="max-width:420px;">
+      <div class="modalHeader">
+        <div class="modalTitle">학생용 접속 QR</div>
+        <button class="btn small" id="closeQr">닫기</button>
+      </div>
+      <div class="modalBody" style="text-align:center;">
+        <div class="help" style="margin:0 0 10px;">
+          학생은 QR을 찍거나, <b class="mono" id="roomCodeText2">------</b> 를 입력해 접속합니다.
+        </div>
+        <canvas id="qrCanvas" width="260" height="260" style="margin:0 auto;"></canvas>
+        <div class="help" style="margin-top:10px; word-break:break-all;" id="roomLinkText"></div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

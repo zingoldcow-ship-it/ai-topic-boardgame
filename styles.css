@@ -542,3 +542,10 @@ body{
   color:#0f172a;
 }
 .keypad-btn:active{transform:translateY(1px);}
+
+/* Overlay / Modal (QR, Join) */
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:9999;padding:16px}
+.overlay .modal{width:min(520px,100%);background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.18)}
+.overlay .modalHeader{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 0}
+.overlay .modalTitle{font-size:16px;font-weight:800}
+.overlay .modalBody{padding:12px}

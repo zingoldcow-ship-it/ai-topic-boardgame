@@ -38,6 +38,23 @@
     rollBtn: $('rollBtn'),
     dice: $('dice'),
     diceResult: $('diceResult'),
+
+    // room share (teacher)
+    makeRoom: $('makeRoom'),
+    showRoomQr: $('showRoomQr'),
+    copyRoomLink: $('copyRoomLink'),
+    roomCodeText: $('roomCodeText'),
+    roomQrOverlay: $('roomQrOverlay'),
+    roomQrCanvas: $('roomQrCanvas'),
+    roomQrCodeText: $('roomQrCodeText'),
+    closeRoomQr: $('closeRoomQr'),
+
+    // join (student)
+    joinOverlay: $('joinOverlay'),
+    joinCodeInput: $('joinCodeInput'),
+    joinCodeBtn: $('joinCodeBtn'),
+    joinErr: $('joinErr'),
+
     scoreP1: $('scoreP1'),
     scoreP2: $('scoreP2'),
     timer: $('timer'),
@@ -83,6 +100,227 @@
   if (MODE !== 'teacher') {
     document.querySelectorAll('[data-teacher-only]').forEach((el) => el.remove());
     if (els.settingsBtn) els.settingsBtn.remove();
+  }
+
+  // ---------- realtime room (Firebase Firestore) ----------
+  const ROOM = {
+    storageKey: 'TOPIC_BOARDGAME_ROOM_CODE_V1',
+    collection: 'rooms',
+  };
+
+  let db = null;
+  let currentRoomCode = null;
+  let roomUnsub = null;
+
+  function initFirebase() {
+    try {
+      const cfg = window.FIREBASE_CONFIG;
+      if (!cfg || !cfg.projectId || !cfg.apiKey) return false;
+      if (!window.firebase || !firebase.initializeApp) return false;
+      if (firebase.apps && firebase.apps.length === 0) {
+        firebase.initializeApp(cfg);
+      } else if (!firebase.apps) {
+        firebase.initializeApp(cfg);
+      }
+      db = firebase.firestore();
+      return true;
+    } catch (e) {
+      console.warn('firebase init failed', e);
+      return false;
+    }
+  }
+
+  function isRoomCode(s) {
+    return /^[0-9]{6}$/.test(String(s || ''));
+  }
+
+  function studentLinkForRoom(code) {
+    const u = new URL('./student.html', window.location.href);
+    u.searchParams.set('room', code);
+    return u.toString();
+  }
+
+  async function roomSetPack(code, pack) {
+    if (!db) return;
+    await db.collection(ROOM.collection).doc(code).set({
+      pack,
+      updatedAt: Date.now(),
+    }, { merge: true });
+  }
+
+  async function createRoom() {
+    if (!db) return null;
+    // collision check
+    for (let i = 0; i < 10; i++) {
+      const code = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0');
+      const ref = db.collection(ROOM.collection).doc(code);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        await ref.set({ createdAt: Date.now() }, { merge: true });
+        return code;
+      }
+    }
+    return null;
+  }
+
+  function bindRoomTeacherUi() {
+    if (!els.makeRoom) return;
+
+    const fbOk = initFirebase();
+    if (!fbOk) {
+      // Firebase 미설정이면 버튼을 비활성화하고 안내만 제공
+      els.makeRoom.disabled = true;
+      if (els.showRoomQr) els.showRoomQr.disabled = true;
+      if (els.copyRoomLink) els.copyRoomLink.disabled = true;
+      if (els.roomCodeText) els.roomCodeText.textContent = '설정필요';
+      addLog('실시간 공유: firebase-config.js에 Firebase 설정을 입력해야 합니다.');
+      return;
+    }
+
+    // restore
+    const saved = localStorage.getItem(ROOM.storageKey);
+    if (isRoomCode(saved)) {
+      currentRoomCode = saved;
+      if (els.roomCodeText) els.roomCodeText.textContent = currentRoomCode;
+      if (els.showRoomQr) els.showRoomQr.disabled = false;
+      if (els.copyRoomLink) els.copyRoomLink.disabled = false;
+    }
+
+    els.makeRoom.addEventListener('click', async () => {
+      const code = await createRoom();
+      if (!code) {
+        alert('수업 코드를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      currentRoomCode = code;
+      localStorage.setItem(ROOM.storageKey, code);
+      if (els.roomCodeText) els.roomCodeText.textContent = code;
+      if (els.showRoomQr) els.showRoomQr.disabled = false;
+      if (els.copyRoomLink) els.copyRoomLink.disabled = false;
+      addLog(`수업 코드 생성: ${code}`);
+
+      // 현재 팩이 있으면 즉시 업로드
+      const pack = loadLastPack();
+      if (pack) {
+        try {
+          await roomSetPack(code, pack);
+          addLog('현재 문제팩을 학생용에 공유했습니다.');
+        } catch (e) {
+          console.warn(e);
+          addLog('문제팩 공유에 실패했습니다(네트워크/DB 설정 확인).');
+        }
+      }
+    });
+
+    if (els.copyRoomLink) {
+      els.copyRoomLink.addEventListener('click', async () => {
+        if (!isRoomCode(currentRoomCode)) return;
+        const link = studentLinkForRoom(currentRoomCode);
+        try {
+          await navigator.clipboard.writeText(link);
+          addLog('학생용 링크를 클립보드에 복사했습니다.');
+        } catch {
+          prompt('아래 링크를 복사해서 학생에게 공유하세요:', link);
+        }
+      });
+    }
+
+    if (els.showRoomQr) {
+      els.showRoomQr.addEventListener('click', () => {
+        if (!isRoomCode(currentRoomCode)) return;
+        const link = studentLinkForRoom(currentRoomCode);
+        if (els.roomQrCodeText) els.roomQrCodeText.textContent = currentRoomCode;
+        if (els.roomQrOverlay) els.roomQrOverlay.style.display = 'flex';
+        // QR 생성
+        if (els.roomQrCanvas && window.QRCode) {
+          QRCode.toCanvas(els.roomQrCanvas, link, { width: 220, margin: 1 }, (err) => {
+            if (err) console.warn(err);
+          });
+        }
+      });
+    }
+
+    if (els.closeRoomQr && els.roomQrOverlay) {
+      els.closeRoomQr.addEventListener('click', () => {
+        els.roomQrOverlay.style.display = 'none';
+      });
+      els.roomQrOverlay.addEventListener('click', (e) => {
+        if (e.target === els.roomQrOverlay) els.roomQrOverlay.style.display = 'none';
+      });
+    }
+  }
+
+  function bindRoomStudentUi() {
+    // 학생은 room 파라미터가 있으면 자동 연결, 없으면 입력 오버레이
+    const fbOk = initFirebase();
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room');
+
+    const goJoin = () => {
+      if (els.joinOverlay) els.joinOverlay.style.display = 'flex';
+    };
+
+    if (!fbOk) {
+      // Firebase 미설정이면 기존 파일 방식으로만 사용
+      if (room) {
+        if (els.joinErr) {
+          els.joinErr.style.display = 'block';
+          els.joinErr.textContent = '실시간 수업 입장은 Firebase 설정이 필요합니다. 선생님께 링크 대신 문제 파일을 받아 불러오세요.';
+        }
+        goJoin();
+      }
+      // join overlay 버튼 동작은 동일(페이지 이동)
+    }
+
+    if (els.joinCodeBtn && els.joinCodeInput) {
+      els.joinCodeBtn.addEventListener('click', () => {
+        const code = String(els.joinCodeInput.value || '').trim();
+        if (!isRoomCode(code)) {
+          if (els.joinErr) {
+            els.joinErr.style.display = 'block';
+            els.joinErr.textContent = '6자리 숫자 코드를 입력하세요.';
+          }
+          return;
+        }
+        const u = new URL(window.location.href);
+        u.searchParams.set('room', code);
+        window.location.href = u.toString();
+      });
+      els.joinCodeInput.addEventListener('input', () => {
+        els.joinCodeInput.value = els.joinCodeInput.value.replace(/\D/g, '').slice(0, 6);
+      });
+    }
+
+    if (!isRoomCode(room)) {
+      goJoin();
+      return;
+    }
+
+    currentRoomCode = room;
+
+    if (!fbOk || !db) {
+      goJoin();
+      return;
+    }
+
+    // 연결
+    if (els.joinOverlay) els.joinOverlay.style.display = 'none';
+    addLog(`수업 코드로 연결: ${room}`);
+
+    const ref = db.collection(ROOM.collection).doc(room);
+    if (roomUnsub) roomUnsub();
+    roomUnsub = ref.onSnapshot((snap) => {
+      const data = snap.data();
+      if (data && data.pack) {
+        try {
+          // 교사가 올린 팩을 적용
+          saveLastPack(data.pack);
+          applyPack(data.pack);
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+    });
   }
 
   // ---------- utils ----------
@@ -671,7 +909,17 @@ const showNotice = (title, text) => {
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes() }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
-      alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
+      // 실시간 공유(수업 코드) 사용 중이면 DB에 업로드
+      if (isRoomCode(currentRoomCode) && db) {
+        try {
+          await roomSetPack(currentRoomCode, pack);
+          addLog('학생용(수업 코드)으로 문제팩을 바로 공유했습니다.');
+        } catch (e) {
+          console.warn(e);
+          addLog('문제팩 실시간 공유에 실패했습니다(네트워크/DB 설정 확인).');
+        }
+      }
+      alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n(수업 코드 공유를 쓰면 학생용에 자동 반영됩니다)`);
     } catch (e) {
       alert(String(e?.message || e));
     } finally {
@@ -764,6 +1012,7 @@ const showNotice = (title, text) => {
   els.resultClose?.addEventListener('click', () => { closeModal(els.resultModal); advanceTurn(); });
 
   if (MODE === 'teacher') {
+    bindRoomTeacherUi();
     els.applyTopic?.addEventListener('click', onApplyTopic);
 
     els.settingsBtn?.addEventListener('click', openDrawer);
@@ -785,6 +1034,8 @@ const showNotice = (title, text) => {
     if (els.activityMinutes) els.activityMinutes.value = String(cfg.activityMinutes ?? DEFAULTS.activityMinutes);
     if (els.apiKeyInput) els.apiKeyInput.value = getSavedKey();
     refreshSetupHint();
+  } else {
+    bindRoomStudentUi();
   }
 
   // restore last pack
