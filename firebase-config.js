@@ -7,12 +7,12 @@
 // 2) apiKey, authDomain, projectId 등은 본인 프로젝트 값으로 교체하세요.
 
 window.FIREBASE_CONFIG = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyAPcmtiiYEcSZQldjLar9-Yzis5wM-Ncac",
+  authDomain: "ai-matter-boardgame.firebaseapp.com",
+  projectId: "ai-matter-boardgame",
+  storageBucket: "ai-matter-boardgame.firebasestorage.app",
+  messagingSenderId: "792165997483",
+  appId: "1:792165997483:web:f7c6bd1fe703773bc210ee"
 };
 
 // 옵션: 여기서 바로 초기화(중복 초기화 방지 포함)
