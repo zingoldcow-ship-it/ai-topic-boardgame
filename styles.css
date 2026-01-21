@@ -299,7 +299,7 @@ body{
 }
 .drawer__panel .x{float:right}
 .drawer__panel h2{margin:0 0 10px; font-size:16px;}
-.drawer__panel .help{color:var(--muted); font-size:12px; line-height:1.4;}
+.drawer__panel .help{color:var(--muted); font-size:11.5px; line-height:1.45;}
 .drawer__panel select,.drawer__panel input{
   width:100%;
   padding:10px 12px;
@@ -309,6 +309,88 @@ body{
 }
 .drawer__panel hr{border:none; border-top:1px solid var(--line); margin:14px 0;}
 .drawer__panel .stack{display:grid; gap:10px;}
+
+/* Settings (teacher drawer) */
+.setting-label{
+  font-size:14px;
+  font-weight:900;
+  color:var(--text);
+  margin:0 0 6px;
+}
+.setting-sub{
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted);
+}
+
+.setting-check{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin:0;
+}
+.setting-check input[type="checkbox"]{
+  width:20px;
+  height:20px;
+  margin:0;
+}
+.setting-check span{
+  font-size:13px;
+  font-weight:800;
+  line-height:1.2;
+}
+
+.btn.softYellow{
+  background:#fef9c3;
+  border-color:#facc15;
+  color:#854d0e;
+}
+.btn.softPink{
+  background:#fce7f3;
+  border-color:#f9a8d4;
+  color:#9d174d;
+}
+
+/* Settings UI tweaks */
+.setting-label{
+  margin:0 0 6px;
+  font-size:14.5px;
+  font-weight:900;
+  color:var(--text);
+  letter-spacing:-0.2px;
+}
+.setting-sub{
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted);
+}
+
+.setting-check{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.setting-check input[type="checkbox"]{
+  width:20px;
+  height:20px;
+  margin:0;
+}
+.setting-check span{
+  font-size:13.5px;
+  font-weight:800;
+  color:var(--text);
+}
+
+.btn.softYellow{
+  background:#fef9c3;
+  border-color:#facc15;
+  color:#854d0e;
+}
+.btn.softPink{
+  background:#fce7f3;
+  border-color:#f9a8d4;
+  color:#9d174d;
+}
 
 @media (max-width: 1100px){
   :root{ --tile:64px; --gap:8px; }
@@ -366,47 +448,3 @@ body{
   margin-top:1px;
 }
 .choice-text{ flex:1; white-space:normal; word-break:keep-all; }
-
-
-/* --- Teacher settings UI tweaks --- */
-.fieldLabel{
-  font-size:14px;
-  font-weight:800;
-  color:var(--text);
-  margin-bottom:8px;
-}
-.fieldLabelSub{
-  font-size:12px;
-  font-weight:700;
-  color:var(--muted);
-  margin-left:6px;
-}
-.checkRow{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin-top:10px;
-}
-.checkRow input[type="checkbox"]{
-  width:20px;
-  height:20px;
-  accent-color: var(--primary);
-}
-.checkRow span{
-  font-weight:800;
-}
-.btn.keysave{
-  background:#fff2b8;
-  border-color:#f0d97a;
-  color:#5a4b00;
-}
-.btn.keydel{
-  background:#ffd6e2;
-  border-color:#f3a7bd;
-  color:#6a0030;
-}
-
-.drawer__panel select,
-.drawer__panel input{
-  font-size:13px;
-}

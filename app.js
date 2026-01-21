@@ -51,6 +51,7 @@
     qModal: $('qModal'),
     qTitle: $('qTitle'),
     qText: $('qText'),
+    choiceWrap: $('choiceWrap'),
     aInput: $('aInput'),
     aSubmit: $('aSubmit'),
     aClose: $('aClose'),
@@ -345,8 +346,7 @@
       `문항 구성: ${qMode === 'mcq_ox' ? '4지선다 중심 + 일부 OX 포함' : '4지선다만'}`,
       '언어: 한국어',
       '난이도: 초등 5~6학년 수준',
-    ].join('
-');
+    ].join('\n');
 
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
