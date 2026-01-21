@@ -491,3 +491,25 @@ body{
 
 .topbarTitle{font-weight:800; font-size:16px;}
 .topbar .sep{opacity:.6; font-weight:700;}
+
+/* guide topbar (teacher) */
+.topbar.guide{
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+}
+.topbar.guide .guideTitle{
+  font-weight:800;
+  font-size:16px;
+  letter-spacing:-0.2px;
+}
+.topbar.guide .guideSteps{
+  font-size:15px;
+  line-height:1.5;
+  font-weight:600;
+}
+.headerActions{
+  justify-content:flex-end;
+  flex-wrap:nowrap;
+}
+.muted{ color: var(--muted); }

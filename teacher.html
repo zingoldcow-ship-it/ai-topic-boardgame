@@ -13,22 +13,27 @@
         <h1>주제형 한바퀴 보드게임 <span class="badge" id="modeBadge">교사용</span></h1>
       </div>
 
-      <div class="tooltip" data-tip="AI 문제 자동생성은 [설정]에서 Gemini API 키를 입력하세요. (설정 안에 ‘API 키 발급받기’ 버튼이 있습니다)">
-        <button class="btn small" id="openSettings">⚙️ 설정</button>
+      <div class="row headerActions">
+        <a class="btn small" href="./index.html">홈</a>
+        <div class="tooltip" data-tip="AI 문제 자동생성은 [설정]에서 Gemini API 키를 입력하세요. (설정 안에 ‘API 키 발급받기’ 버튼이 있습니다)">
+          <button class="btn small" id="openSettings">⚙️ 설정</button>
+        </div>
       </div>
     </div>
 
-          <div class="topbar">
-        <span class="topbarTitle">사용방법:</span>
-        <span>1) <b>설정</b>에서 Gemini API 키 발급·저장 및 옵션 세팅</span>
-        <span class="sep">→</span>
-        <span>2) <b>주제 입력</b></span>
-        <span class="sep">→</span>
-        <span>3) <b>문제 적용</b>(작동 확인)</span>
-        <span class="sep">→</span>
-        <span>4) <b>문제 파일 저장</b></span>
-        <span class="sep">→</span>
-        <span>5) 학생에게 배부 (<b>학생용</b>에서 <b>문제 파일 불러오기</b>)</span>
+          <div class="topbar guide">
+        <div class="guideTitle">사용방법</div>
+        <div class="guideSteps">
+          1) <b>설정</b>에서 Gemini API 키 발급·저장 및 옵션 세팅
+          <span class="sep">→</span>
+          2) <b>주제 입력</b>
+          <span class="sep">→</span>
+          3) <b>문제 적용</b>(작동 확인)
+          <span class="sep">→</span>
+          4) <b>문제 파일 저장</b>
+          <span class="sep">→</span>
+          5) 학생에게 배부 (<b>학생용</b>에서 <b>문제 파일 불러오기</b>)
+        </div>
       </div>
 
     <div class="main">
@@ -46,7 +51,7 @@
             ⚠️ 처음 사용이라면 <button class="linkBtn" type="button" id="openSettingsInline">설정</button>에서 Gemini API 키를 저장한 뒤 ‘문제 적용’을 눌러주세요.
           </div>
 
-                    <div class="badge" data-pack-topic>문제 파일이 없습니다. (문제 적용 또는 불러오기)</div>
+                    <div class="badge" data-pack-topic>문제 파일이 없습니다.<br><span class="muted">(문제 적용 또는 불러오기)</span></div>
 
           <div style="height:10px"></div>
 
@@ -73,7 +78,7 @@
         </div>
 
         <div class="card" style="margin-top:14px;">
-          <h2>로그</h2>
+          <h2>진행상황</h2>
           <div class="log" id="log"></div>
         </div>
       </div>
@@ -117,7 +122,7 @@
   <div class="modal" id="resultModal" aria-hidden="true">
     <div class="backdrop"></div>
     <div class="panel">
-      <h3>결과</h3>
+      <h3 id="resultTitle">결과</h3>
       <p id="resultText"></p>
       <div class="row" style="justify-content:flex-end; margin-top:10px;">
         <button class="btn primary" id="resultClose">확인</button>

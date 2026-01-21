@@ -456,6 +456,16 @@
   const openModal = (el) => el?.classList.add('open');
   const closeModal = (el) => el?.classList.remove('open');
 
+const showNotice = (title, text) => {
+  const modal = $('#resultModal');
+  const titleEl = $('#resultTitle') || modal?.querySelector('h3');
+  const textEl = $('#resultText');
+  if (titleEl) titleEl.textContent = title || '안내';
+  if (textEl) textEl.textContent = text || '';
+  openModal(modal);
+};
+
+
   
   function askQuestion(kindWanted='mcq') {
     const q = nextQuestion(kindWanted);
@@ -557,6 +567,7 @@
       if (cell.action === 'skip') {
         state.skip[p] += 1;
         logLine(`${p===0?'빨강':'파랑'} : 한 번 쉬기`);
+        showNotice('⏸️ 한 번 쉬기', '이번 턴은 쉽니다. 다음 차례로 넘어갑니다.');
         advanceTurn();
         return;
       }
