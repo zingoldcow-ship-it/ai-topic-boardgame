@@ -43,7 +43,7 @@ body{
 .title p{
   margin:4px 0 0;
   color:var(--muted);
-  font-size:13px;
+  font-size:15px;
 }
 
 .topbar{
@@ -54,7 +54,7 @@ body{
   backdrop-filter: blur(6px);
   border-radius:14px;
   color:#0f172a;
-  font-size:13px;
+  font-size:15px;
   display:flex;
   gap:10px;
   align-items:center;
@@ -78,7 +78,7 @@ body{
 }
 .btn.primary{background:var(--blue); border-color:var(--blue); color:white;}
 .btn.danger{background:#dc2626; border-color:#dc2626; color:white;}
-.btn.small{padding:8px 10px; border-radius:10px; font-size:13px;}
+.btn.small{padding:8px 10px; border-radius:10px; font-size:15px;}
 .btn:disabled{opacity:.6; cursor:not-allowed;}
 
 .tooltip{position:relative;}
@@ -125,7 +125,7 @@ body{
   align-items:center;
 }
 .field label{
-  font-size:13px;
+  font-size:15px;
   color:var(--muted);
   min-width:54px;
 }
@@ -149,7 +149,7 @@ body{
   display:inline-flex;
   gap:8px;
   align-items:center;
-  font-size:13px;
+  font-size:15px;
   color:var(--muted);
   border:1px dashed var(--line);
   padding:8px 10px;
@@ -233,7 +233,7 @@ body{
 }
 .tile-emoji{width:18px; text-align:center; flex:0 0 auto;}
 .tile-text{
-  font-size:13px;
+  font-size:15px;
   font-weight:800;
   line-height:1.1;
   display:-webkit-box;
@@ -258,7 +258,7 @@ body{
   border:1px solid var(--line);
   border-radius:12px;
   padding:10px;
-  font-size:13px;
+  font-size:15px;
   color:#0f172a;
   background:#fbfdff;
 }
@@ -336,7 +336,7 @@ body{
   margin:0;
 }
 .setting-check span{
-  font-size:13px;
+  font-size:15px;
   font-weight:800;
   line-height:1.2;
 }
@@ -459,7 +459,7 @@ body{
   align-items:center;
   justify-content:center;
   font-weight:700;
-  font-size:13px;
+  font-size:15px;
   color:#1d4ed8;
   margin-top:1px;
 }
@@ -487,3 +487,7 @@ body{
   text-decoration:underline;
 }
 .linkBtn:hover{filter:brightness(.92);}
+
+
+.topbarTitle{font-weight:800; font-size:16px;}
+.topbar .sep{opacity:.6; font-weight:700;}
