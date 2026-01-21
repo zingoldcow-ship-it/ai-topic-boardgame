@@ -128,7 +128,7 @@
 
       <div class="stack">
 <div>
-          <div class="help" style="margin-bottom:6px;"><b>Gemini API 키</b></div>
+          <div class="fieldLabel">Gemini API 키</div>
           <input id="apiKeyInput" type="password" placeholder="AIza..." />
           <div class="row" style="margin-top:10px;">
             <button class="btn" id="getKeyBtn" type="button">API 키 발급받기(구글)</button>
@@ -137,8 +137,8 @@
         </div>
 
 <div class="row">
-          <button class="btn primary" id="saveKey">키 저장</button>
-          <button class="btn danger" id="deleteKey">키 삭제</button>
+          <button class="btn keysave" id="saveKey">키 저장</button>
+          <button class="btn keydel" id="deleteKey">키 삭제</button>
         </div>
 
 
@@ -147,7 +147,7 @@
         </div>
 
 <div>
-          <div class="help" style="margin-bottom:6px;"><b>모델</b></div>
+          <div class="fieldLabel">모델</div>
           <select id="geminiModel">
             <option value="gemini-2.0-flash">gemini-2.0-flash</option>
             <option value="gemini-1.5-flash">gemini-1.5-flash</option>
@@ -156,7 +156,7 @@
 
 
         <div>
-          <div class="help" style="margin-bottom:6px;"><b>문항 유형</b></div>
+          <div class="fieldLabel">문항 유형</div>
           <select id="qMode">
             <option value="mcq">4지선다</option>
             <option value="mcq_ox">4지선다 + OX</option>
@@ -165,25 +165,22 @@
         </div>
 
         <div>
-          <label style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+          <label class="checkRow">
             <input id="showAnswer" type="checkbox" checked />
-            <span><b>학생 화면에서 정답/해설 공개</b></span>
+            <span>학생 화면에서 정답/해설 공개</span>
           </label>
           <div class="help">끄면 학생은 정오답만 확인하고 정답/해설은 보지 못합니다.</div>
         </div>
 
 
         <div>
-          <div class="help" style="margin-bottom:6px;"><b>문제 수</b> (덱 총 문항 수)</div>
+          <div class="fieldLabel">문제 수 <span class="fieldLabelSub">(덱 총 문항 수)</span></div>
           <input id="deckCount" type="number" min="6" max="200" value="30" />
           <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
         </div>
 
-<div>
-          <div class="help" style="margin-bottom:6px;"><b>문제 수</b> (덱 총 문항 수)</div>
-          <input id="deckCount" type="number" min="6" max="200" value="30" />
-          <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
-        </div>
+
+
 
 
         <div class="row">

@@ -366,3 +366,47 @@ body{
   margin-top:1px;
 }
 .choice-text{ flex:1; white-space:normal; word-break:keep-all; }
+
+
+/* --- Teacher settings UI tweaks --- */
+.fieldLabel{
+  font-size:14px;
+  font-weight:800;
+  color:var(--text);
+  margin-bottom:8px;
+}
+.fieldLabelSub{
+  font-size:12px;
+  font-weight:700;
+  color:var(--muted);
+  margin-left:6px;
+}
+.checkRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+}
+.checkRow input[type="checkbox"]{
+  width:20px;
+  height:20px;
+  accent-color: var(--primary);
+}
+.checkRow span{
+  font-weight:800;
+}
+.btn.keysave{
+  background:#fff2b8;
+  border-color:#f0d97a;
+  color:#5a4b00;
+}
+.btn.keydel{
+  background:#ffd6e2;
+  border-color:#f3a7bd;
+  color:#6a0030;
+}
+
+.drawer__panel select,
+.drawer__panel input{
+  font-size:13px;
+}
