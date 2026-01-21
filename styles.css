@@ -13,9 +13,9 @@
   --cols:10;
   --rows:6;
   /* 노트북/태블릿 기준: 화면에 맞춰 자동 확대/축소 */
-  --tilew:clamp(92px, 8.6vw, 136px);
-  --tileh:clamp(78px, 6.5vw, 102px);
-  --gap:10px;
+  --tilew:96px;
+  --tileh:78px;
+  --gap:8px;
   --frame:#1f2a36;
   --quiz:#f4f8ff;
   --action:#fff9f1;
@@ -81,7 +81,6 @@ body.no-scroll{overflow:hidden}
 #board{position:relative;display:grid;grid-template-columns:repeat(var(--cols), var(--tilew));grid-template-rows:repeat(var(--rows), var(--tileh));gap:var(--gap);padding:var(--gap);background:#f7f8fb;border:6px solid transparent;border-radius:18px;box-shadow:0 14px 32px rgba(0,0,0,.12), inset 0 0 0 4px var(--frame);width:fit-content;max-width:100%;margin:0 auto;overflow:auto}
 
 /* 작은 화면에서 보드가 넘치면 가로 스크롤 허용 */
-.stage{overflow-x:auto}
 
 /* rails */
 #rails{position:absolute;inset:6px;border-radius:16px;pointer-events:none;z-index:0}
@@ -139,3 +138,15 @@ body.no-scroll{overflow:hidden}
 .ol{margin:8px 0 0 18px;color:var(--ink);line-height:1.55}
 .details{margin-top:8px}
 .code{white-space:pre-wrap;background:#0b1220;color:#e5e7eb;border-radius:12px;padding:12px;border:1px solid rgba(226,232,240,.12);font-size:12px;overflow:auto}
+
+/* Intro bar (top 안내/사용방법) */
+.introbar{max-width:var(--maxw);margin:12px auto 0;padding:12px 14px;background:#ffffff;border:1px solid #e6eaf2;border-radius:14px;box-shadow:0 6px 18px rgba(15,23,42,.06)}
+.introbar__row{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.introbar__title{font-weight:900;color:#0f172a}
+.introbar__text{color:#334155}
+.introbar__steps{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 0;padding-left:18px;color:#0f172a}
+.introbar__steps li{margin:0}
+.introbar__note{margin-top:8px;color:#475569;font-size:13px}
+@media (max-width: 900px){
+  .introbar__steps{gap:10px}
+}
