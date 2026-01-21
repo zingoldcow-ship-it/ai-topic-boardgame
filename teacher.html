@@ -34,7 +34,11 @@
             <button class="btn primary" id="applyTopic">문제 적용</button>
           </div>
 
-          <div class="badge" data-pack-topic>문제 파일이 없습니다. (문제 적용 또는 불러오기)</div>
+          <div class="hint" id="setupHint" style="display:none;">
+            ⚠️ 처음 사용이라면 <button class="linkBtn" type="button" id="openSettingsInline">설정</button>에서 Gemini API 키를 저장한 뒤 ‘문제 적용’을 눌러주세요.
+          </div>
+
+                    <div class="badge" data-pack-topic>문제 파일이 없습니다. (문제 적용 또는 불러오기)</div>
 
           <div style="height:10px"></div>
 
@@ -176,6 +180,14 @@
           <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
         </div>
 
+
+
+
+        <div>
+          <div class="setting-label">활동시간 <span class="setting-sub">(분)</span></div>
+          <input id="activityMinutes" type="number" min="1" max="180" value="7" />
+          <div class="help">게임 시작 시 타이머가 이 시간으로 설정됩니다. (학생용에도 문제 파일에 함께 저장됨)</div>
+        </div>
 
         <div class="row">
           <button class="btn primary" id="saveAi">설정 저장</button>

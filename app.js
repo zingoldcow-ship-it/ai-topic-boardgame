@@ -14,6 +14,7 @@
     deckCount: 30,
     qMode: 'mcq',
     showAnswer: true,
+    activityMinutes: 7,
     gameSeconds: 420,
     cols: 10,
     rows: 6,
@@ -28,6 +29,8 @@
     // teacher controls
     topicInput: $('topicInput'),
     applyTopic: $('applyTopic'),
+    setupHint: $('setupHint'),
+    openSettingsInline: $('openSettingsInline'),
 
     // common controls
     startGame: $('startGame'),
@@ -71,6 +74,7 @@
     qMode: $('qMode'),
     showAnswer: $('showAnswer'),
     deckCount: $('deckCount'),
+    activityMinutes: $('activityMinutes'),
     testAi: $('testAi'),
     saveAi: $('saveAi'),
   };
@@ -138,9 +142,28 @@
       qMode: cfg?.qMode || DEFAULTS.qMode,
       showAnswer: (typeof cfg?.showAnswer === 'boolean') ? cfg.showAnswer : DEFAULTS.showAnswer,
       deckCount: Number.isFinite(cfg?.deckCount) ? cfg.deckCount : DEFAULTS.deckCount,
+      activityMinutes: Number.isFinite(cfg?.activityMinutes) ? cfg.activityMinutes : DEFAULTS.activityMinutes,
     };
   }
   function setAiConfig(cfg) { localStorage.setItem(STORAGE.aiConfig, JSON.stringify(cfg)); }
+
+
+  function getConfiguredMinutes() {
+    // priority: pack(학생용 배포용) → 저장된 설정(교사용) → 기본값
+    const p = state.pack?.settings?.activityMinutes;
+    const cfg = getAiConfig();
+    const m0 = Number.isFinite(p) ? p : (Number.isFinite(cfg?.activityMinutes) ? cfg.activityMinutes : DEFAULTS.activityMinutes);
+    return clamp(Number(m0), 1, 180);
+  }
+  function getConfiguredGameSeconds() { return getConfiguredMinutes() * 60; }
+
+  function refreshSetupHint() {
+    if (MODE !== 'teacher') return;
+    if (!els.setupHint) return;
+    const hasKey = !!getSavedKey().trim();
+    els.setupHint.style.display = hasKey ? 'none' : 'block';
+  }
+
 
   function saveLastPack(pack) { localStorage.setItem(STORAGE.savedPack, JSON.stringify(pack)); }
   function loadLastPack() {
@@ -297,7 +320,8 @@
     }
 
     // settings optional
-    if (!pack.settings) pack.settings = { showAnswer: true, qMode: 'mcq' };
+    if (!pack.settings) pack.settings = { showAnswer: true, qMode: 'mcq', activityMinutes: DEFAULTS.activityMinutes };
+    if (!Number.isFinite(pack.settings.activityMinutes)) pack.settings.activityMinutes = DEFAULTS.activityMinutes;
     return {ok:true};
   }
 
@@ -318,6 +342,11 @@
     const topicLine = document.querySelector('[data-pack-topic]');
     if (topicLine) topicLine.textContent = `문제: ${pack.topic} (총 ${pack.deck.length}문항)`;
 
+    if (!state.started) {
+      state.remaining = getConfiguredGameSeconds();
+      setTimer();
+    }
+
     logLine(`문제 파일 적용: ${pack.topic} / ${pack.deck.length}문항`);
   }
 
@@ -326,6 +355,11 @@
       alert('저장할 문제 파일이 없습니다. (교사: 먼저 문제 적용 / 학생: 파일 불러오기)');
       return;
     }
+    // ensure exported pack includes timer setting
+    const cfg = getAiConfig();
+    if (!state.pack.settings) state.pack.settings = {};
+    state.pack.settings.activityMinutes = Number.isFinite(state.pack.settings.activityMinutes) ? state.pack.settings.activityMinutes : clamp(Number(cfg.activityMinutes), 1, 180);
+
     const name = `주제형_보드게임_문제_${(state.pack.topic||'topic').replace(/\s+/g,'_')}_${nowStamp().slice(0,10)}.json`;
     downloadText(name, JSON.stringify(state.pack, null, 2));
   }
@@ -564,7 +598,7 @@
 
   function startTimer() {
     stopTimer();
-    state.remaining = DEFAULTS.gameSeconds;
+    state.remaining = getConfiguredGameSeconds();
     setTimer();
     state.timerId = setInterval(() => {
       state.remaining -= 1;
@@ -596,7 +630,7 @@
     state.pos = [0,0];
     state.score = [0,0];
     state.skip = [0,0];
-    state.remaining = DEFAULTS.gameSeconds;
+    state.remaining = getConfiguredGameSeconds();
     setScores();
     setTimer();
     drawTokens();
@@ -609,7 +643,7 @@
     if (!topic) { alert('주제를 입력하세요.'); return; }
 
     const apiKey = getSavedKey().trim();
-    if (!apiKey) { alert('Gemini API 키가 필요합니다. 우측 상단 [설정]에서 API 키를 입력하세요.'); return; }
+    if (!apiKey) { alert('Gemini API 키가 필요합니다. [설정]에서 API 키를 저장한 뒤 다시 시도하세요.'); refreshSetupHint(); return; }
 
     const cfg = getAiConfig();
     const model = els.modelSel?.value || cfg.model;
@@ -623,7 +657,7 @@
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
       const deck = await geminiGenerateDeck({ topic, count, model, apiKey, qMode });
       const aiCfg = getAiConfig() || {};
-      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode }, deck };
+      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes() }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
@@ -643,11 +677,13 @@
     const v = (els.apiKeyInput.value || '').trim();
     if (!v) { alert('API 키를 입력하세요.'); return; }
     setSavedKey(v);
+    refreshSetupHint();
     alert('API 키를 저장했습니다. (이 PC/브라우저에만 저장)');
   }
   function onDeleteKey() {
     clearSavedKey();
     if (els.apiKeyInput) els.apiKeyInput.value = '';
+    refreshSetupHint();
     alert('API 키를 삭제했습니다.');
   }
 
@@ -656,7 +692,21 @@
     const qMode = els.qMode?.value || DEFAULTS.qMode;
     const showAnswer = !!(els.showAnswer?.checked);
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
-    setAiConfig({ model, qMode, showAnswer, deckCount });
+    const activityMinutes = clamp(Number(els.activityMinutes?.value || DEFAULTS.activityMinutes), 1, 180);
+    setAiConfig({ model, qMode, showAnswer, deckCount, activityMinutes });
+
+    // reflect into current pack (so 학생용 파일에도 반영)
+    if (state.pack) {
+      if (!state.pack.settings) state.pack.settings = {};
+      state.pack.settings.activityMinutes = activityMinutes;
+      saveLastPack(state.pack);
+    }
+
+    // reflect into timer UI (다음 게임부터 적용)
+    if (!state.started) {
+      state.remaining = getConfiguredGameSeconds();
+      setTimer();
+    }
     alert('설정을 저장했습니다.');
   }
 
@@ -706,6 +756,7 @@
     els.applyTopic?.addEventListener('click', onApplyTopic);
 
     els.settingsBtn?.addEventListener('click', openDrawer);
+    els.openSettingsInline?.addEventListener('click', openDrawer);
     els.closeSettings?.addEventListener('click', closeDrawer);
     els.drawer?.querySelector('.drawer__backdrop')?.addEventListener('click', closeDrawer);
 
@@ -720,10 +771,17 @@
     if (els.qMode) els.qMode.value = cfg.qMode || DEFAULTS.qMode;
     if (els.showAnswer) els.showAnswer.checked = !!cfg.showAnswer;
     if (els.deckCount) els.deckCount.value = String(cfg.deckCount);
+    if (els.activityMinutes) els.activityMinutes.value = String(cfg.activityMinutes ?? DEFAULTS.activityMinutes);
     if (els.apiKeyInput) els.apiKeyInput.value = getSavedKey();
+    refreshSetupHint();
   }
 
   // restore last pack
   const last = loadLastPack();
   if (last && validatePack(last).ok) applyPack(last, {resetDeck:false});
+  else {
+    // no pack yet: show configured timer
+    state.remaining = getConfiguredGameSeconds();
+    setTimer();
+  }
 })();
