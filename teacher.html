@@ -93,7 +93,8 @@
     <div class="panel">
       <h3 id="qTitle">문제</h3>
       <p id="qText"></p>
-      <input id="aInput" placeholder="정답 입력" />
+      <div id="choiceWrap" class="choices"></div>
+      <input id="aInput" placeholder="정답 입력" style="display:none" />
       <div class="row" style="justify-content:flex-end; margin-top:10px;">
         <button class="btn" id="aClose">닫기</button>
         <button class="btn primary" id="aSubmit">확인</button>
@@ -126,21 +127,7 @@
       <hr/>
 
       <div class="stack">
-        <div>
-          <div class="help" style="margin-bottom:6px;"><b>모델</b></div>
-          <select id="geminiModel">
-            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-          </select>
-        </div>
-
-        <div>
-          <div class="help" style="margin-bottom:6px;"><b>문제 수</b> (덱 총 문항 수)</div>
-          <input id="deckCount" type="number" min="6" max="200" value="30" />
-          <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
-        </div>
-
-        <div>
+<div>
           <div class="help" style="margin-bottom:6px;"><b>Gemini API 키</b></div>
           <input id="apiKeyInput" type="password" placeholder="AIza..." />
           <div class="row" style="margin-top:10px;">
@@ -149,14 +136,58 @@
           <div class="help" style="margin-top:8px;">키는 이 브라우저(PC)에만 저장됩니다. 다른 PC에서는 다시 입력해야 합니다.</div>
         </div>
 
-        <div class="row">
+<div class="row">
           <button class="btn primary" id="saveKey">키 저장</button>
           <button class="btn danger" id="deleteKey">키 삭제</button>
         </div>
 
+
         <div class="row">
-          <button class="btn" id="saveAi">AI 설정 저장</button>
           <button class="btn" id="testAi">AI 연결 테스트</button>
+        </div>
+
+<div>
+          <div class="help" style="margin-bottom:6px;"><b>모델</b></div>
+          <select id="geminiModel">
+            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+          </select>
+        </div>
+
+
+        <div>
+          <div class="help" style="margin-bottom:6px;"><b>문항 유형</b></div>
+          <select id="qMode">
+            <option value="mcq">4지선다</option>
+            <option value="mcq_ox">4지선다 + OX</option>
+          </select>
+          <div class="help">기본은 4지선다입니다. OX를 함께 생성할 수도 있습니다.</div>
+        </div>
+
+        <div>
+          <label style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+            <input id="showAnswer" type="checkbox" checked />
+            <span><b>학생 화면에서 정답/해설 공개</b></span>
+          </label>
+          <div class="help">끄면 학생은 정오답만 확인하고 정답/해설은 보지 못합니다.</div>
+        </div>
+
+
+        <div>
+          <div class="help" style="margin-bottom:6px;"><b>문제 수</b> (덱 총 문항 수)</div>
+          <input id="deckCount" type="number" min="6" max="200" value="30" />
+          <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
+        </div>
+
+<div>
+          <div class="help" style="margin-bottom:6px;"><b>문제 수</b> (덱 총 문항 수)</div>
+          <input id="deckCount" type="number" min="6" max="200" value="30" />
+          <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
+        </div>
+
+
+        <div class="row">
+          <button class="btn primary" id="saveAi">설정 저장</button>
         </div>
       </div>
 
