@@ -8,20 +8,46 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <div class="brand__title">주제형 한바퀴 보드게임</div>
-      <div class="brand__sub">주제 입력 → 말판 문제 교체 · 2인 턴제 · 저장/복원</div>
-    </div>
-    <div class="topbar__actions">
-      <button id="openSettings" class="iconbtn" title="설정">
-        <span aria-hidden="true">⚙️</span>
-      </button>
+    <div class="topbar__inner">
+      <div class="brand">
+        <div class="brand__title">주제형 한바퀴 보드게임</div>
+        <div class="brand__sub">주제 입력 → 말판 문제 교체 · 2인 턴제 · 파일 저장/불러오기</div>
+      </div>
+      <div class="topbar__actions">
+        <button id="openSettings" class="settingsbtn" title="설정">
+          <span aria-hidden="true">⚙️</span>
+          <span>설정</span>
+        </button>
+      </div>
     </div>
   </header>
 
   <main class="page">
     <div class="layout">
     <section class="panel">
+
+      <div class="card">
+        <div class="card__title">안내</div>
+        <div class="stack">
+          <div class="hint">
+            주제를 입력하면 말판의 문제가 바뀌는 <b>2인 수업용 보드게임</b>입니다.
+            (학생 정보는 저장하지 않습니다)
+          </div>
+          <div class="divider"></div>
+          <div class="hint" style="font-weight:900;color:#0f172a">사용 방법</div>
+          <ol class="ol" style="margin-top:0">
+            <li><b>주제 입력 → 문제 적용</b></li>
+            <li><b>게임 시작하기</b></li>
+            <li>2명이 번갈아 <b>주사위 굴리기</b></li>
+            <li>원하면 <b>내 수업용 문제 파일 저장</b>으로 파일로 보관</li>
+          </ol>
+          <div class="divider"></div>
+          <div class="hint">
+            ※ AI로 문제 자동 생성을 쓰려면 우측 상단 <b>설정</b>에서 <b>Gemini API 키</b>를 입력하세요.
+            키 발급은 설정 화면의 <b>API 키 발급받기</b> 버튼을 누르면 됩니다.
+          </div>
+        </div>
+      </div>
       <div class="card">
         <div class="card__title">게임 시작</div>
         <div class="stack">
