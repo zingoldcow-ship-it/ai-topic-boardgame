@@ -7,10 +7,10 @@
 
 // TODO: 아래를 실제 값으로 교체하세요.
 window.FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyAPcmtiiYEcSZQldjLar9-Yzis5wM-Ncac",
+  authDomain: "ai-matter-boardgame.firebaseapp.com",
+  projectId: "ai-matter-boardgame",
+  storageBucket: "ai-matter-boardgame.firebasestorage.app",
+  messagingSenderId: "792165997483",
+  appId: "1:792165997483:web:f7c6bd1fe703773bc210ee"
 };
