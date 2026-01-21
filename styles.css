@@ -513,3 +513,32 @@ body{
   flex-wrap:nowrap;
 }
 .muted{ color: var(--muted); }
+
+/* Teacher gate */
+.teacher-locked .container{filter:blur(2px); pointer-events:none; user-select:none;}
+.gate-panel{max-width:520px;}
+.pin-wrap{margin:8px 0 10px;}
+.pin-display{display:flex; gap:10px; justify-content:center; margin:10px 0 8px;}
+.pin-dot{
+  width:14px; height:14px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:#fff;
+}
+.pin-dot.filled{background:#0f172a;}
+.pin-hint{font-size:13px; color:var(--muted); text-align:center; margin-bottom:10px;}
+.keypad{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:10px;
+}
+.keypad-btn{
+  height:54px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:#fbfdff;
+  font-size:18px;
+  font-weight:700;
+  color:#0f172a;
+}
+.keypad-btn:active{transform:translateY(1px);}
