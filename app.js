@@ -12,6 +12,8 @@
   const DEFAULTS = {
     model: 'gemini-2.0-flash',
     deckCount: 30,
+    qMode: 'mcq',
+    showAnswer: true,
     gameSeconds: 420,
     cols: 10,
     rows: 6,
@@ -65,6 +67,8 @@
     deleteKey: $('deleteKey'),
     getKeyBtn: $('getKeyBtn'),
     modelSel: $('geminiModel'),
+    qMode: $('qMode'),
+    showAnswer: $('showAnswer'),
     deckCount: $('deckCount'),
     testAi: $('testAi'),
     saveAi: $('saveAi'),
@@ -83,6 +87,11 @@
     try { return JSON.parse(text); } catch {}
     return null;
   }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
 
   function nowStamp() {
     const d = new Date();
@@ -125,6 +134,8 @@
     const cfg = raw ? safeJsonParse(raw) : null;
     return {
       model: cfg?.model || DEFAULTS.model,
+      qMode: cfg?.qMode || DEFAULTS.qMode,
+      showAnswer: (typeof cfg?.showAnswer === 'boolean') ? cfg.showAnswer : DEFAULTS.showAnswer,
       deckCount: Number.isFinite(cfg?.deckCount) ? cfg.deckCount : DEFAULTS.deckCount,
     };
   }
@@ -233,8 +244,9 @@
     remaining: DEFAULTS.gameSeconds,
     timerId: null,
 
-    pack: null,       // {version, topic, createdAt, model, deck:[]}
-    deckIndex: 0,
+    pack: null,       // {version, topic, createdAt, model, settings, deck:[]}
+    deckQueues: { mcq: [], ox: [] },
+    deckPos: { mcq: 0, ox: 0 },
     currentQuestion: null,
   };
 
@@ -269,13 +281,38 @@
   function validatePack(pack) {
     if (!pack || typeof pack !== 'object') return {ok:false, msg:'파일 형식이 올바르지 않습니다.'};
     if (!pack.topic) return {ok:false, msg:'주제(topic)가 없습니다.'};
-    if (!Array.isArray(pack.deck)) return {ok:false, msg:'문제 목록(deck)이 없습니다.'};
+    if (!Array.isArray(pack.deck) || pack.deck.length === 0) return {ok:false, msg:'문제 목록(deck)이 없습니다.'};
+
+    for (const it of pack.deck) {
+      const kind = String(it.kind || 'mcq').toLowerCase();
+      if (!it.question || !Array.isArray(it.choices)) return {ok:false, msg:'문제 형식이 올바르지 않습니다.'};
+      if (kind === 'ox') {
+        if (it.choices.length !== 2) return {ok:false, msg:'OX 문제 choices는 2개여야 합니다.'};
+        if (!(it.answerIndex === 0 || it.answerIndex === 1)) return {ok:false, msg:'OX answerIndex가 올바르지 않습니다.'};
+      } else {
+        if (it.choices.length !== 4) return {ok:false, msg:'4지선다 choices는 4개여야 합니다.'};
+        if (!(it.answerIndex >= 0 && it.answerIndex <= 3)) return {ok:false, msg:'answerIndex가 올바르지 않습니다.'};
+      }
+    }
+
+    // settings optional
+    if (!pack.settings) pack.settings = { showAnswer: true, qMode: 'mcq' };
     return {ok:true};
   }
 
   function applyPack(pack, {resetDeck=true}={}) {
     state.pack = pack;
-    if (resetDeck) state.deckIndex = 0;
+
+    // rebuild queues for deck consumption
+    const mcq = [];
+    const ox = [];
+    (pack.deck || []).forEach((it) => {
+      const kind = String(it.kind || 'mcq').toLowerCase();
+      if (kind === 'ox') ox.push(it);
+      else mcq.push(it);
+    });
+    state.deckQueues = { mcq, ox };
+    if (resetDeck) state.deckPos = { mcq: 0, ox: 0 };
 
     const topicLine = document.querySelector('[data-pack-topic]');
     if (topicLine) topicLine.textContent = `문제: ${pack.topic} (총 ${pack.deck.length}문항)`;
@@ -293,19 +330,23 @@
   }
 
   // ---------- gemini (teacher) ----------
-  async function geminiGenerateDeck({topic, count, model, apiKey}) {
+  async function geminiGenerateDeck({topic, count, model, apiKey, qMode}) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const prompt = [
-      '당신은 수업용 퀴즈 제작자입니다.',
-      '주어진 주제로 학생 2명이 보드게임에서 풀 수 있는 짧은 문제를 만듭니다.',
+      '당신은 초등 5~6학년 수업용 4지선다 퀴즈 제작자입니다.',
+      '주어진 주제로 보드게임에서 학생 2명이 풀 수 있는 짧은 문제를 만듭니다.',
       '반드시 JSON 배열만 출력합니다(다른 텍스트 금지).',
-      '스키마: [{ "type":"핵심|정의|OX|예시|비교|이유", "q":"...", "a":"..." }]',
-      'OX는 a에 "O" 또는 "X"만 넣습니다.',
+      '스키마(4지선다): { "kind":"mcq", "question":"...", "choices":["...","...","...","..."], "answerIndex":0~3, "explain":"(1~2문장)" }',
+      '스키마(OX): { "kind":"ox", "question":"...", "choices":["O","X"], "answerIndex":0~1, "explain":"(1~2문장)" }',
+      'choices에는 정답이 하나만 있도록 구성하고, answerIndex는 정답 보기의 인덱스입니다.',
       '',
       `주제: ${topic}`,
       `개수: ${count}`,
+      `문항 구성: ${qMode === 'mcq_ox' ? '4지선다 중심 + 일부 OX 포함' : '4지선다만'}`,
+      '언어: 한국어',
       '난이도: 초등 5~6학년 수준',
-    ].join('\n');
+    ].join('
+');
 
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -330,35 +371,90 @@
     } catch {}
     if (!Array.isArray(arr)) throw new Error('Gemini 응답을 해석할 수 없습니다. (JSON 배열 필요)');
 
-    const deck = arr.map(it => ({
-      type: String(it.type || '핵심').trim(),
-      q: String(it.q || '').trim(),
-      a: String(it.a || '').trim(),
-    })).filter(it => it.q);
+    const deck = arr.map((it) => {
+      const kind = String(it.kind || 'mcq').trim();
+      const question = String(it.question || '').trim();
+      const choices = Array.isArray(it.choices) ? it.choices.map(x => String(x).trim()) : [];
+      const answerIndex = Number.isFinite(Number(it.answerIndex)) ? Number(it.answerIndex) : -1;
+      const explain = String(it.explain || '').trim();
+
+      if (!question) return null;
+
+      if (kind === 'ox') {
+        const c = (choices.length === 2) ? choices : ['O','X'];
+        const ai = (answerIndex === 0 || answerIndex === 1) ? answerIndex : 0;
+        return { kind:'ox', question, choices: c, answerIndex: ai, explain };
+      }
+
+      // mcq
+      if (choices.length !== 4) return null;
+      if (!(answerIndex >= 0 && answerIndex <= 3)) return null;
+      return { kind:'mcq', question, choices, answerIndex, explain };
+    }).filter(Boolean);
 
     if (deck.length === 0) throw new Error('생성된 문제가 없습니다.');
     return deck;
   }
 
-  function nextQuestion() {
+  function nextQuestion(kindWanted='mcq') {
     if (!state.pack || !Array.isArray(state.pack.deck) || state.pack.deck.length === 0) return null;
-    if (state.deckIndex >= state.pack.deck.length) return { _depleted:true };
-    return state.pack.deck[state.deckIndex++];
+
+    const q = (k) => {
+      const arr = state.deckQueues?.[k] || [];
+      const pos = state.deckPos?.[k] || 0;
+      if (pos >= arr.length) return null;
+      state.deckPos[k] = pos + 1;
+      return arr[pos];
+    };
+
+    // try wanted kind first
+    let item = q(kindWanted);
+
+    // fallback: if OX exhausted, use mcq; if mcq exhausted, use ox
+    if (!item && kindWanted === 'ox') item = q('mcq');
+    if (!item && kindWanted === 'mcq') item = q('ox');
+
+    if (!item) return { _depleted:true };
+    return item;
   }
 
   // ---------- modals ----------
   const openModal = (el) => el?.classList.add('open');
   const closeModal = (el) => el?.classList.remove('open');
 
-  function askQuestion() {
-    const q = nextQuestion();
+  
+  function askQuestion(kindWanted='mcq') {
+    const q = nextQuestion(kindWanted);
     if (!q) { alert('문제 파일이 없습니다. (교사: 문제 적용 / 학생: 문제 파일 불러오기)'); return; }
     if (q._depleted) { alert('문제 덱이 모두 소진되었습니다.'); return; }
 
     state.currentQuestion = q;
-    els.qTitle.textContent = `${q.type || '문제'} (${state.deckIndex}/${state.pack.deck.length})`;
-    els.qText.textContent = q.q;
-    els.aInput.value = '';
+    state.selectedChoice = null;
+
+    const total = state.pack?.deck?.length || 0;
+    const used = (state.deckPos?.mcq || 0) + (state.deckPos?.ox || 0);
+    els.qTitle.textContent = `${q.kind === 'ox' ? 'OX' : '4지선다'} (${used}/${total})`;
+    els.qText.textContent = q.question || '';
+
+    // render choices
+    const wrap = els.choiceWrap;
+    if (wrap) wrap.innerHTML = '';
+    const labels = (q.kind === 'ox') ? ['O','X'] : ['①','②','③','④'];
+
+    (q.choices || []).forEach((c, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'choice-btn';
+      btn.dataset.index = String(i);
+      btn.innerHTML = `<span class="choice-meta"><span class="choice-badge">${labels[i] || (i+1)}</span><span class="choice-text">${escapeHtml(String(c))}</span></span>`;
+      btn.addEventListener('click', () => {
+        state.selectedChoice = i;
+        wrap?.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+      wrap?.appendChild(btn);
+    });
+
     openModal(els.qModal);
   }
 
@@ -366,31 +462,30 @@
     const q = state.currentQuestion;
     if (!q) return;
 
-    const ans = (els.aInput.value || '').trim();
-    if (!ans) { alert('정답(또는 입력)을 적어주세요.'); return; }
-
-    const expected = (q.a || '').trim();
-    let correct = false;
-
-    if (!expected) correct = true;
-    else if (expected.toUpperCase() === 'O' || expected.toUpperCase() === 'X') {
-      correct = (ans.toUpperCase() === expected.toUpperCase());
-    } else {
-      const n1 = ans.replace(/\s+/g,'').toLowerCase();
-      const n2 = expected.replace(/\s+/g,'').toLowerCase();
-      correct = (n1 === n2) || n1.includes(n2) || n2.includes(n1);
+    if (state.selectedChoice === null || state.selectedChoice === undefined) {
+      alert('보기를 선택해주세요.');
+      return;
     }
+
+    const correct = (Number(state.selectedChoice) === Number(q.answerIndex));
 
     if (correct) state.score[state.turn] += 1;
     setScores();
 
     closeModal(els.qModal);
 
-    els.resultText.textContent = correct
-      ? `정답! (+1점)\n모범답: ${expected || '(제시 없음)'}`
-      : `오답.\n모범답: ${expected || '(제시 없음)'}`;
+    const showAnswer = !!(state.pack?.settings?.showAnswer);
+
+    const ansText = escapeHtml(q.choices?.[q.answerIndex] ?? '');
+    const expText = q.explain ? `<br/><span style="color:var(--muted)">${escapeHtml(q.explain)}</span>` : '';
+
+    els.resultText.innerHTML = correct
+      ? (showAnswer ? `<b>정답!</b><br/>정답: ${ansText}${expText}` : `<b>정답!</b>`)
+      : (showAnswer ? `<b>오답!</b><br/>정답: ${ansText}${expText}` : `<b>오답!</b>`);
+
     openModal(els.resultModal);
   }
+
 
   // ---------- dice face ----------
   function setDiceFace(n) {
@@ -439,7 +534,8 @@
     }
 
     if (cell.kind === 'quiz') {
-      askQuestion();
+      const want = (cell.qtype === 'ox') ? 'ox' : 'mcq';
+      askQuestion(want);
       return;
     }
 
@@ -523,8 +619,11 @@
     els.applyTopic.textContent = '생성 중...';
 
     try {
-      const deck = await geminiGenerateDeck({ topic, count, model, apiKey });
-      const pack = { version: 2, topic, createdAt: nowStamp(), model, deck };
+      const aiCfg0 = getAiConfig() || {};
+      const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
+      const deck = await geminiGenerateDeck({ topic, count, model, apiKey, qMode });
+      const aiCfg = getAiConfig() || {};
+      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
@@ -554,9 +653,11 @@
 
   function onSaveAi() {
     const model = els.modelSel?.value || DEFAULTS.model;
+    const qMode = els.qMode?.value || DEFAULTS.qMode;
+    const showAnswer = !!(els.showAnswer?.checked);
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
-    setAiConfig({ model, deckCount });
-    alert('AI 설정을 저장했습니다.');
+    setAiConfig({ model, qMode, showAnswer, deckCount });
+    alert('설정을 저장했습니다.');
   }
 
   async function onTestAi() {
@@ -564,7 +665,8 @@
     if (!apiKey) { alert('API 키가 없습니다.'); return; }
     const model = els.modelSel?.value || DEFAULTS.model;
     try {
-      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey });
+      const qMode = els.qMode?.value || DEFAULTS.qMode;
+      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode });
       alert('연결 성공!');
     } catch (e) {
       alert(String(e?.message || e));
@@ -615,6 +717,8 @@
 
     const cfg = getAiConfig();
     if (els.modelSel) els.modelSel.value = cfg.model;
+    if (els.qMode) els.qMode.value = cfg.qMode || DEFAULTS.qMode;
+    if (els.showAnswer) els.showAnswer.checked = !!cfg.showAnswer;
     if (els.deckCount) els.deckCount.value = String(cfg.deckCount);
     if (els.apiKeyInput) els.apiKeyInput.value = getSavedKey();
   }
