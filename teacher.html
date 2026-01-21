@@ -132,18 +132,14 @@
           <div class="setting-label">Gemini API 키</div>
           <input id="apiKeyInput" type="password" placeholder="AIza..." />
           <div class="row" style="margin-top:10px;">
-            <button class="btn" id="getKeyBtn" type="button">API 키 발급받기(구글)</button>
+            <button class="btn softYellow" id="getKeyBtn" type="button">API 키 발급받기(구글)</button>
           </div>
           <div class="help" style="margin-top:8px;">키는 이 브라우저(PC)에만 저장됩니다. 다른 PC에서는 다시 입력해야 합니다.</div>
         </div>
 
-        <div class="row">
-          <button class="btn softYellow" id="saveKey">키 저장</button>
+        <div class="row actions">
+          <button class="btn softBlue" id="saveKey">키 저장</button>
           <button class="btn softPink" id="deleteKey">키 삭제</button>
-        </div>
-
-
-        <div class="row">
           <button class="btn" id="testAi">AI 연결 테스트</button>
         </div>
 
@@ -160,7 +156,7 @@
           <div class="setting-label">문항 유형</div>
           <select id="qMode">
             <option value="mcq">4지선다</option>
-            <option value="mcq_ox">4지선다 + OX</option>
+            <option value="mcq_ox">4지선다+ ox퀴즈</option>
           </select>
           <div class="help">기본은 4지선다입니다. OX를 함께 생성할 수도 있습니다.</div>
         </div>

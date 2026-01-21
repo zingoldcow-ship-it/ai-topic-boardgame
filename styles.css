@@ -371,14 +371,29 @@ body{
   align-items:center;
 }
 .setting-check input[type="checkbox"]{
-  width:20px;
-  height:20px;
+  width:26px;
+  height:26px;
   margin:0;
 }
 .setting-check span{
   font-size:13.5px;
   font-weight:800;
   color:var(--text);
+  white-space:nowrap;
+}
+
+/* Keep setting checkbox + label on one line */
+.setting-check{flex-wrap:nowrap;}
+
+/* Settings action buttons in one row */
+.row.actions{flex-wrap:nowrap;}
+.row.actions .btn{flex:1; white-space:nowrap;}
+
+/* Soft button colors (settings drawer) */
+.btn.softBlue{
+  background:#dbeafe;
+  border-color:#93c5fd;
+  color:#1e40af;
 }
 
 .btn.softYellow{
