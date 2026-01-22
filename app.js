@@ -62,6 +62,8 @@
     resultModal: $('resultModal'),
     resultText: $('resultText'),
     resultClose: $('resultClose'),
+    resultCopy: $('resultCopy'),
+    resultDownload: $('resultDownload'),
 
     // settings drawer (teacher only)
     drawer: $('drawer'),
@@ -216,7 +218,10 @@ const showNotice = (title, text) => {
   const titleEl = $('#resultTitle') || modal?.querySelector('h3');
   const textEl = $('#resultText');
   if (titleEl) titleEl.textContent = title || '안내';
-  if (textEl) textEl.textContent = text || '';
+    if (textEl) {
+    if (textEl.tagName === 'TEXTAREA') textEl.value = text || '';
+    else textEl.textContent = text || '';
+  }
   openModal(modal);
 };
 
@@ -518,6 +523,49 @@ const showNotice = (title, text) => {
 
   els.aSubmit?.addEventListener('click', gradeAnswer);
   els.aClose?.addEventListener('click', () => { closeModal(els.qModal); advanceTurn(); });
+  // result modal helpers (copy / download)
+  function getResultText() {
+    const el = els.resultText;
+    if (!el) return '';
+    return (el.tagName === 'TEXTAREA') ? (el.value || '') : (el.textContent || '');
+  }
+  function downloadText(filename, text) {
+    try{
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('다운로드에 실패했습니다.');
+    }
+  }
+
+  els.resultCopy?.addEventListener('click', async () => {
+    const text = getResultText();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      // simple feedback
+      alert('복사했습니다.');
+    } catch (e) {
+      // fallback: select text for manual copy
+      const el = els.resultText;
+      if (el && el.tagName === 'TEXTAREA') { el.focus(); el.select(); }
+      alert('자동 복사가 차단되었습니다. 텍스트가 선택되면 복사(Ctrl/Cmd+C)하세요.');
+    }
+  });
+
+  els.resultDownload?.addEventListener('click', () => {
+    const text = getResultText();
+    if (!text) return;
+    downloadText('gemini_raw.txt', text);
+  });
+
   els.resultClose?.addEventListener('click', () => { closeModal(els.resultModal); advanceTurn(); });
 
   if (MODE === 'teacher') {

@@ -123,8 +123,10 @@
     <div class="backdrop"></div>
     <div class="panel">
       <h3 id="resultTitle">결과</h3>
-      <p id="resultText"></p>
+      <textarea id="resultText" class="resultTextArea" readonly></textarea>
       <div class="row" style="justify-content:flex-end; margin-top:10px;">
+        <button class="btn" id="resultCopy">복사</button>
+        <button class="btn" id="resultDownload">다운로드</button>
         <button class="btn primary" id="resultClose">확인</button>
       </div>
     </div>
