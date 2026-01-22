@@ -225,22 +225,51 @@
       });
     }
 
-    if (els.showRoomQr) {
-      els.showRoomQr.addEventListener('click', () => {
-        if (!isRoomCode(currentRoomCode)) return;
-        const link = studentLinkForRoom(currentRoomCode);
-        if (els.roomQrCodeText) els.roomQrCodeText.textContent = currentRoomCode;
-        if (els.roomQrOverlay) els.roomQrOverlay.style.display = 'flex';
-        // QR 생성
-        if (els.roomQrCanvas && window.QRCode) {
-          QRCode.toCanvas(els.roomQrCanvas, link, { width: 220, margin: 1 }, (err) => {
-            if (err) console.warn(err);
-          });
-        }
-      });
-    }
+    function renderRoomQr(link) {
+  const canvas = els.roomQrCanvas;
+  if (!canvas) return;
+  // clear
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
 
-    if (els.closeRoomQr && els.roomQrOverlay) {
+  const QR = (window.QRCode && (window.QRCode.toCanvas ? window.QRCode : null))
+          || (window.qrcode && (window.qrcode.toCanvas ? window.qrcode : null));
+
+  if (!QR) {
+    // show a readable fallback so it doesn't look "broken"
+    if (ctx) {
+      ctx.font = '14px sans-serif';
+      ctx.fillText('QR 라이브러리 로드 실패', 20, 40);
+      ctx.fillText('학생 링크 복사로 공유하세요.', 20, 65);
+    }
+    addLog('QR 생성 실패: QRCode 라이브러리가 로드되지 않았습니다. (네트워크 차단/광고차단/혼합콘텐츠 확인)');
+    return;
+  }
+
+  QR.toCanvas(canvas, link, { width: 220, margin: 1 }, (err) => {
+    if (err) {
+      console.warn(err);
+      addLog('QR 생성 실패: ' + (err.message || err));
+    }
+  });
+}
+
+if (els.showRoomQr) {
+  els.showRoomQr.addEventListener('click', () => {
+    if (!isRoomCode(currentRoomCode)) {
+      addLog('수업 코드(6자리)가 먼저 필요합니다.');
+      return;
+    }
+    const link = studentLinkForRoom(currentRoomCode);
+    if (els.roomQrCodeText) els.roomQrCodeText.textContent = currentRoomCode;
+    if (els.roomQrOverlay) els.roomQrOverlay.style.display = 'flex';
+    // QR 생성: 오버레이가 그려진 뒤 렌더링 (iPad/저사양 브라우저 안정화)
+    setTimeout(() => renderRoomQr(link), 0);
+  });
+}
+if (els.closeRoomQr && els.roomQrOverlay) {
       els.closeRoomQr.addEventListener('click', () => {
         els.roomQrOverlay.style.display = 'none';
       });
