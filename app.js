@@ -739,7 +739,8 @@ const showNotice = (title, text) => {
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
     } catch (e) {
-      alert(String(e?.message || e));
+      const msg = String(e?.message || e);
+      showNotice("오류", msg);
     } finally {
       els.applyTopic.disabled = false;
       els.applyTopic.textContent = '문제 적용';
@@ -796,7 +797,8 @@ const showNotice = (title, text) => {
       await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode });
       alert('연결 성공!');
     } catch (e) {
-      alert(String(e?.message || e));
+      const msg = String(e?.message || e);
+      showNotice("오류", msg);
     }
   }
 
