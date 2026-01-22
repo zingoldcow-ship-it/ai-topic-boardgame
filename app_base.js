@@ -85,14 +85,35 @@
   function clamp(n, a, b) { return Math.min(Math.max(n, a), b); }
 
   function safeJsonParse(text) {
-    try { return JSON.parse(text); } catch { /* ignore */ }
-    // try: extract first JSON array
-    const start = text.indexOf('[');
-    const end = text.lastIndexOf(']');
-    if (start >= 0 && end > start) {
-      const slice = text.slice(start, end + 1);
-      try { return JSON.parse(slice); } catch { /* ignore */ }
+    if (!text) return null;
+    let t = String(text).trim();
+
+    // 1) Extract from ```json ... ``` fences if present
+    const fence = t.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fence && fence[1]) t = fence[1].trim();
+
+    // 2) Try direct parse
+    try { return JSON.parse(t); } catch { /* ignore */ }
+
+    // 3) Try slicing JSON array portion
+    const a0 = t.indexOf('[');
+    const a1 = t.lastIndexOf(']');
+    if (a0 !== -1 && a1 !== -1 && a1 > a0) {
+      const sub = t.slice(a0, a1 + 1).trim();
+      try { return JSON.parse(sub); } catch { /* ignore */ }
     }
+
+    // 4) Try slicing JSON object portion
+    const o0 = t.indexOf('{');
+    const o1 = t.lastIndexOf('}');
+    if (o0 !== -1 && o1 !== -1 && o1 > o0) {
+      const sub = t.slice(o0, o1 + 1).trim();
+      try { return JSON.parse(sub); } catch { /* ignore */ }
+    }
+
+    return null;
+  }
+
     return null;
   }
 

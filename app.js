@@ -89,9 +89,35 @@
   const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
 
   function safeJsonParse(text) {
-    try { return JSON.parse(text); } catch {}
+    if (!text) return null;
+    let t = String(text).trim();
+
+    // 1) Extract from ```json ... ``` fences if present
+    const fence = t.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fence && fence[1]) t = fence[1].trim();
+
+    // 2) Try direct parse
+    try { return JSON.parse(t); } catch { /* ignore */ }
+
+    // 3) Try slicing JSON array portion
+    const a0 = t.indexOf('[');
+    const a1 = t.lastIndexOf(']');
+    if (a0 !== -1 && a1 !== -1 && a1 > a0) {
+      const sub = t.slice(a0, a1 + 1).trim();
+      try { return JSON.parse(sub); } catch { /* ignore */ }
+    }
+
+    // 4) Try slicing JSON object portion
+    const o0 = t.indexOf('{');
+    const o1 = t.lastIndexOf('}');
+    if (o0 !== -1 && o1 !== -1 && o1 > o0) {
+      const sub = t.slice(o0, o1 + 1).trim();
+      try { return JSON.parse(sub); } catch { /* ignore */ }
+    }
+
     return null;
   }
+
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -400,8 +426,13 @@
     let arr = null;
     try {
       const obj = JSON.parse(raw);
-      const t = obj?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      arr = safeJsonParse(t);
+      const parts = obj?.candidates?.[0]?.content?.parts || [];
+      const t = parts.map((p) => p?.text || '').join('').trim();
+      const parsed = safeJsonParse(t);
+      arr = Array.isArray(parsed) ? parsed
+        : (Array.isArray(parsed?.deck) ? parsed.deck
+          : (Array.isArray(parsed?.questions) ? parsed.questions
+            : (Array.isArray(parsed?.items) ? parsed.items : null)));
     } catch {}
     if (!Array.isArray(arr)) throw new Error('Gemini 응답을 해석할 수 없습니다. (JSON 배열 필요)');
 
