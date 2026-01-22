@@ -46,8 +46,6 @@
     roomCodeText: $('roomCodeText'),
     roomQrOverlay: $('roomQrOverlay'),
     roomQrCanvas: $('roomQrCanvas'),
-    roomQrImg: $('roomQrImg'),
-    roomQrSvg: $('roomQrSvg'),
     roomQrCodeText: $('roomQrCodeText'),
     closeRoomQr: $('closeRoomQr'),
 
@@ -150,15 +148,7 @@
     }, { merge: true });
   }
 
-  
-  async function roomSetConfig(code, config) {
-    if (!db) return;
-    await db.collection(ROOM.collection).doc(code).set({
-      config,
-      updatedAt: Date.now(),
-    }, { merge: true });
-  }
-async function createRoom() {
+  async function createRoom() {
     if (!db) return null;
     // collision check
     for (let i = 0; i < 10; i++) {
@@ -166,13 +156,7 @@ async function createRoom() {
       const ref = db.collection(ROOM.collection).doc(code);
       const snap = await ref.get();
       if (!snap.exists) {
-        await ref.set({ createdAt: Date.now() }, { merge: true });
-        // 초기 설정(활동시간 등)도 방 문서에 저장
-        try {
-          const cfg = getAiConfig();
-          await ref.set({ config: { activityMinutes: getConfiguredMinutes(), model: cfg.model, qMode: cfg.qMode, showAnswer: cfg.showAnswer, deckCount: cfg.deckCount } }, { merge: true });
-        } catch {}
-
+        await ref.set({ createdAt: Date.now(), config: { activityMinutes: getAiConfig().activityMinutes } }, { merge: true });
         return code;
       }
     }
@@ -241,63 +225,26 @@ async function createRoom() {
       });
     }
 
-    function renderRoomQr(link) {
-  const canvas = els.roomQrCanvas;
-  const img = els.roomQrImg;
-  const svgBox = els.roomQrSvg;
-
-  // 1) Local SVG QR via qrcodegen (no external network, no CDN)
+    if (els.showRoomQr) {
+      els.showRoomQr.addEventListener('click', () => {
+        if (!isRoomCode(currentRoomCode)) return;
+        const link = studentLinkForRoom(currentRoomCode);
+        if (els.roomQrCodeText) els.roomQrCodeText.textContent = currentRoomCode;
+        if (els.roomQrOverlay) els.roomQrOverlay.style.display = 'flex';
+        // QR 생성 (로컬 생성: 외부 CDN/네트워크 불필요)
+if (els.roomQrCanvas && window.qrcodegen && window.qrcodegen.QrCode) {
   try {
-    if (window.qrcodegen && window.qrcodegen.QrCode) {
-      const qr = window.qrcodegen.QrCode.encodeText(String(link), window.qrcodegen.QrCode.Ecc.MEDIUM);
-      const svg = qr.toSvgString(2);
-
-      if (canvas) canvas.style.display = 'none';
-      if (img) img.style.display = 'none';
-      if (svgBox) {
-        svgBox.style.display = 'block';
-        svgBox.innerHTML = svg;
-      }
-      return;
+    drawQrToCanvas(els.roomQrCanvas, link);
+  } catch (e) { console.warn(e); }
+} else {
+  console.warn('QR 라이브러리(qrcodegen) 로드 실패');
+}
+);
+        }
+      });
     }
-  } catch (e) {
-    console.warn('local QR failed', e);
-  }
 
-  // 2) Fallback: image-based QR (may be blocked by network)
-  if (canvas) canvas.style.display = 'none';
-  if (svgBox) svgBox.style.display = 'none';
-
-  if (img) {
-    img.style.display = 'block';
-    img.alt = '학생용 접속 QR';
-
-    const google = 'https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=' + encodeURIComponent(link);
-    const backup = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(link);
-
-    img.onerror = () => { img.onerror = null; img.src = backup; };
-    img.src = google;
-  } else {
-    addLog('QR 표시 실패: roomQrImg 요소를 찾지 못했습니다.');
-  }
-}
-}
-
-if (els.showRoomQr)
- {
-  els.showRoomQr.addEventListener('click', () => {
-    if (!isRoomCode(currentRoomCode)) {
-      addLog('수업 코드(6자리)가 먼저 필요합니다.');
-      return;
-    }
-    const link = studentLinkForRoom(currentRoomCode);
-    if (els.roomQrCodeText) els.roomQrCodeText.textContent = currentRoomCode;
-    if (els.roomQrOverlay) els.roomQrOverlay.style.display = 'flex';
-    // QR 생성: 오버레이가 그려진 뒤 렌더링 (iPad/저사양 브라우저 안정화)
-    setTimeout(() => renderRoomQr(link), 0);
-  });
-}
-if (els.closeRoomQr && els.roomQrOverlay) {
+    if (els.closeRoomQr && els.roomQrOverlay) {
       els.closeRoomQr.addEventListener('click', () => {
         els.roomQrOverlay.style.display = 'none';
       });
@@ -311,16 +258,8 @@ if (els.closeRoomQr && els.roomQrOverlay) {
     // 학생은 room 파라미터가 있으면 자동 연결, 없으면 입력 오버레이
     const fbOk = initFirebase();
     const params = new URLSearchParams(window.location.search);
-    let room = params.get('room');
-    // 같은 기기에서 '홈→학생용'으로 이동하면 URL 파라미터가 사라질 수 있어, 마지막 수업 코드를 보조로 사용
-    if (!room) {
-      const saved = localStorage.getItem(ROOM.storageKey);
-      if (isRoomCode(saved)) room = saved;
-    }
+    const room = params.get('room');
 
-    // debug
-    try { console.log('[student] room param:', params.get('room'), 'saved:', localStorage.getItem(ROOM.storageKey)); } catch {}
-    try { if (els.joinErr) { els.joinErr.style.display='none'; } } catch {}
     const goJoin = () => {
       if (els.joinOverlay) els.joinOverlay.style.display = 'flex';
     };
@@ -374,48 +313,62 @@ if (els.closeRoomQr && els.roomQrOverlay) {
 
     const ref = db.collection(ROOM.collection).doc(room);
     if (roomUnsub) roomUnsub();
-    
     roomUnsub = ref.onSnapshot((snap) => {
       const data = snap.data() || {};
+      const roomMinutes = Number(data?.config?.activityMinutes);
 
-      // room config minutes (teacher setting)
-      const roomMinutes = (data.config && Number.isFinite(data.config.activityMinutes))
-        ? clamp(Number(data.config.activityMinutes), 1, 180)
-        : null;
+      // 1) 교사 설정(활동시간)은 pack보다 우선
+      const hasRoomMinutes = Number.isFinite(roomMinutes) && roomMinutes > 0;
 
-      // 설정 동기화 (활동시간 등) - roomMinutes가 있으면 pack보다 우선
-      if (roomMinutes != null) {
-        if (!state.pack) state.pack = { cards: [], settings: {} };
-        if (!state.pack.settings) state.pack.settings = {};
-        state.pack.settings.activityMinutes = roomMinutes;
-        state.roomConfigMinutes = roomMinutes;
-
-        // 타이머 반영(게임 시작 전이면 즉시 반영)
-        if (!state.started) {
-          state.remaining = getConfiguredGameSeconds();
-          setTimer();
-        }
-      }
-
-      // 문제팩 동기화
+      // 2) 교사가 올린 팩이 있으면 적용 (단, roomMinutes가 있으면 settings를 강제 덮어쓰기)
       if (data.pack) {
         try {
-          
-// room config가 있으면 pack.settings보다 우선 적용
-if (roomMinutes != null) {
-  if (!data.pack.settings) data.pack.settings = {};
-  data.pack.settings.activityMinutes = roomMinutes;
-}
-saveLastPack(data.pack);
-applyPack(data.pack);
+          const pack = data.pack;
+          if (hasRoomMinutes) {
+            if (!pack.settings) pack.settings = {};
+            pack.settings.activityMinutes = roomMinutes;
+          }
+          saveLastPack(pack);
+          applyPack(pack);
         } catch (e) {
           console.warn(e);
         }
       }
+
+      // 3) 팩이 없어도 roomMinutes만으로 타이머를 즉시 반영
+      if (hasRoomMinutes && !state.started) {
+        state.remaining = Math.round(roomMinutes * 60);
+        setTimer();
+      }
     });
   }
 
-  // ---------- utils ----------
+  function drawQrToCanvas(canvas, text) {
+  const qr = window.qrcodegen.QrCode.encodeText(String(text), window.qrcodegen.QrCode.Ecc.MEDIUM);
+  const size = qr.size;
+  const border = 2; // modules
+  const ctx = canvas.getContext('2d');
+  const scale = Math.floor(Math.min(canvas.width, canvas.height) / (size + border * 2));
+  const drawSize = (size + border * 2) * scale;
+  // center
+  const ox = Math.floor((canvas.width - drawSize) / 2);
+  const oy = Math.floor((canvas.height - drawSize) / 2);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (qr.getModule(x, y)) {
+        ctx.fillRect(ox + (x + border) * scale, oy + (y + border) * scale, scale, scale);
+      }
+    }
+  }
+}
+
+// ---------- utils ----------
   const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
 
   function safeJsonParse(text) {
@@ -657,11 +610,6 @@ applyPack(data.pack);
 
   function applyPack(pack, {resetDeck=true}={}) {
     state.pack = pack;
-    // If room config minutes exist, override pack default (student sync fix)
-    if (Number.isFinite(state.roomConfigMinutes)) {
-      if (!state.pack.settings) state.pack.settings = {};
-      state.pack.settings.activityMinutes = state.roomConfigMinutes;
-    }
 
     // rebuild queues for deck consumption
     const mcq = [];
@@ -1051,11 +999,6 @@ const showNotice = (title, text) => {
     const activityMinutes = clamp(Number(els.activityMinutes?.value || DEFAULTS.activityMinutes), 1, 180);
     setAiConfig({ model, qMode, showAnswer, deckCount, activityMinutes });
 
-    // 실시간 공유 중이면 학생용에도 설정을 동기화
-    if (MODE === 'teacher' && isRoomCode(currentRoomCode)) {
-      roomSetConfig(currentRoomCode, { model, qMode, showAnswer, deckCount, activityMinutes }).catch(() => {});
-    }
-
     // reflect into current pack (so 학생용 파일에도 반영)
     if (state.pack) {
       if (!state.pack.settings) state.pack.settings = {};
@@ -1069,6 +1012,15 @@ const showNotice = (title, text) => {
       setTimer();
     }
     alert('설정을 저장했습니다.');
+
+// 현재 수업방이 있으면(실시간 공유 중이면) 방 설정도 동기화
+if (db && currentRoomCode) {
+  db.collection(ROOM.collection).doc(currentRoomCode)
+    .set({ config: { activityMinutes } }, { merge: true })
+    .catch((e) => console.warn(e));
+}
+
+
   }
 
   async function onTestAi() {
