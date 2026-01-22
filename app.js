@@ -47,6 +47,7 @@
     roomQrOverlay: $('roomQrOverlay'),
     roomQrCanvas: $('roomQrCanvas'),
     roomQrImg: $('roomQrImg'),
+    roomQrSvg: $('roomQrSvg'),
     roomQrCodeText: $('roomQrCodeText'),
     closeRoomQr: $('closeRoomQr'),
 
@@ -243,9 +244,30 @@ async function createRoom() {
     function renderRoomQr(link) {
   const canvas = els.roomQrCanvas;
   const img = els.roomQrImg;
+  const svgBox = els.roomQrSvg;
 
-  // Prefer image-based QR (works without any JS QR library; 학교망에서 CDN 차단 이슈 회피)
+  // 1) Local SVG QR via qrcodegen (no external network, no CDN)
+  try {
+    if (window.qrcodegen && window.qrcodegen.QrCode) {
+      const qr = window.qrcodegen.QrCode.encodeText(String(link), window.qrcodegen.QrCode.Ecc.MEDIUM);
+      const svg = qr.toSvgString(2);
+
+      if (canvas) canvas.style.display = 'none';
+      if (img) img.style.display = 'none';
+      if (svgBox) {
+        svgBox.style.display = 'block';
+        svgBox.innerHTML = svg;
+      }
+      return;
+    }
+  } catch (e) {
+    console.warn('local QR failed', e);
+  }
+
+  // 2) Fallback: image-based QR (may be blocked by network)
   if (canvas) canvas.style.display = 'none';
+  if (svgBox) svgBox.style.display = 'none';
+
   if (img) {
     img.style.display = 'block';
     img.alt = '학생용 접속 QR';
@@ -253,12 +275,12 @@ async function createRoom() {
     const google = 'https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=' + encodeURIComponent(link);
     const backup = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(link);
 
-    // googleapis가 막힌 경우를 대비해 1회 백업
     img.onerror = () => { img.onerror = null; img.src = backup; };
     img.src = google;
   } else {
     addLog('QR 표시 실패: roomQrImg 요소를 찾지 못했습니다.');
   }
+}
 }
 
 if (els.showRoomQr)
@@ -296,6 +318,9 @@ if (els.closeRoomQr && els.roomQrOverlay) {
       if (isRoomCode(saved)) room = saved;
     }
 
+    // debug
+    try { console.log('[student] room param:', params.get('room'), 'saved:', localStorage.getItem(ROOM.storageKey)); } catch {}
+    try { if (els.joinErr) { els.joinErr.style.display='none'; } } catch {}
     const goJoin = () => {
       if (els.joinOverlay) els.joinOverlay.style.display = 'flex';
     };
@@ -363,6 +388,7 @@ if (els.closeRoomQr && els.roomQrOverlay) {
         if (!state.pack) state.pack = { cards: [], settings: {} };
         if (!state.pack.settings) state.pack.settings = {};
         state.pack.settings.activityMinutes = roomMinutes;
+        state.roomConfigMinutes = roomMinutes;
 
         // 타이머 반영(게임 시작 전이면 즉시 반영)
         if (!state.started) {
@@ -631,6 +657,11 @@ applyPack(data.pack);
 
   function applyPack(pack, {resetDeck=true}={}) {
     state.pack = pack;
+    // If room config minutes exist, override pack default (student sync fix)
+    if (Number.isFinite(state.roomConfigMinutes)) {
+      if (!state.pack.settings) state.pack.settings = {};
+      state.pack.settings.activityMinutes = state.roomConfigMinutes;
+    }
 
     // rebuild queues for deck consumption
     const mcq = [];
