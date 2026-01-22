@@ -451,7 +451,7 @@ function extractObjectsFromText(text) {
 
 const body = {
   contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  generationConfig: { temperature: 0.6, maxOutputTokens: 2048, responseMimeType: 'application/json' },
+  generationConfig: { temperature: 0.6, maxOutputTokens: 8192, responseMimeType: 'application/json' },
 };
 
 const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -489,27 +489,78 @@ if (!Array.isArray(arr)) {
 }
 
     const deck = arr.map((it) => {
-      const kind = String(it.kind || 'mcq').trim();
+      const kind = String(it.kind || 'mcq').trim().toLowerCase();
       const question = String(it.question || '').trim();
-      const choices = Array.isArray(it.choices) ? it.choices.map(x => String(x).trim()) : [];
-      const answerIndex = Number.isFinite(Number(it.answerIndex)) ? Number(it.answerIndex) : -1;
+
+      // choices normalization (Gemini sometimes returns 4+ options or numbered strings)
+      let choices = Array.isArray(it.choices) ? it.choices.map(x => String(x).trim()) : [];
+      if (choices.length > 4 && (kind !== 'ox')) choices = choices.slice(0, 4);
+
       const explain = String(it.explain || '').trim();
+
+      // answerIndex normalization:
+      // - allow 0-based (0~3) or 1-based (1~4)
+      // - allow string numbers
+      let ai = Number.isFinite(Number(it.answerIndex)) ? Number(it.answerIndex) : NaN;
 
       if (!question) return null;
 
       if (kind === 'ox') {
         const c = (choices.length === 2) ? choices : ['O','X'];
-        const ai = (answerIndex === 0 || answerIndex === 1) ? answerIndex : 0;
+        // allow 0/1 or 1/2
+        if (ai === 1 || ai === 2) ai = ai - 1;
+        if (!(ai === 0 || ai === 1)) ai = 0;
         return { kind:'ox', question, choices: c, answerIndex: ai, explain };
       }
 
       // mcq
       if (choices.length !== 4) return null;
-      if (!(answerIndex >= 0 && answerIndex <= 3)) return null;
-      return { kind:'mcq', question, choices, answerIndex, explain };
+
+      if (ai === 1 || ai === 2 || ai === 3 || ai === 4) ai = ai - 1; // 1-based -> 0-based
+      if (!(ai >= 0 && ai <= 3)) return null;
+
+      return { kind:'mcq', question, choices, answerIndex: ai, explain };
     }).filter(Boolean);
 
     if (deck.length === 0) throw new Error('생성된 문제가 없습니다.');
+
+
+  // Generate deck in batches to reliably reach requested count (avoids token truncation).
+  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode }) {
+    const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
+
+    // Heuristic batch size: keeps outputs within token limits even with explanations.
+    const batchSize = Math.min(16, target);
+    const out = [];
+    const seen = new Set();
+
+    // hard stop to avoid infinite loops
+    let guard = 0;
+    while (out.length < target && guard < 10) {
+      guard++;
+      const remain = target - out.length;
+      const n = Math.min(batchSize, remain);
+
+      // Ask Gemini to continue with new questions (avoid duplicates).
+      const deckPart = await geminiGenerateDeck({ topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만)`, count: n, model, apiKey, qMode });
+
+      for (const q of deckPart) {
+        const key = (q.kind + '|' + q.question).slice(0, 200);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(q);
+        if (out.length >= target) break;
+      }
+
+      // If we failed to add enough (too many invalid/duplicate), reduce batch to recover
+      if (deckPart.length === 0) break;
+      if (deckPart.length < Math.max(3, Math.floor(n / 2)) && batchSize > 8) {
+        // (best-effort) shrink batch next round
+      }
+    }
+
+    return out.slice(0, target);
+  }
     return deck;
   }
 
@@ -609,9 +660,23 @@ const showNotice = (title, text) => {
     const ansText = escapeHtml(q.choices?.[q.answerIndex] ?? '');
     const expText = q.explain ? `<br/><span style="color:var(--muted)">${escapeHtml(q.explain)}</span>` : '';
 
-    els.resultText.innerHTML = correct
-      ? (showAnswer ? `<b>정답!</b><br/>정답: ${ansText}${expText}` : `<b>정답!</b>`)
-      : (showAnswer ? `<b>오답!</b><br/>정답: ${ansText}${expText}` : `<b>오답!</b>`);
+    if (MODE === 'teacher') {
+      // Teacher view: plain text (no HTML/code-like tags)
+      const label = correct ? '정답!' : '오답!';
+      const lines = [];
+      lines.push(label);
+      if (showAnswer) {
+        lines.push(`정답: ${q.choices?.[q.answerIndex] ?? ''}`);
+        if (q.explain) lines.push(`해설: ${q.explain}`);
+      }
+      if ('value' in els.resultText) els.resultText.value = lines.join('\n');
+      else els.resultText.textContent = lines.join('\n');
+    } else {
+      // Student view: formatted HTML
+      els.resultText.innerHTML = correct
+        ? (showAnswer ? `<b>정답!</b><br/>정답: ${ansText}${expText}` : `<b>정답!</b>`)
+        : (showAnswer ? `<b>오답!</b><br/>정답: ${ansText}${expText}` : `<b>오답!</b>`);
+    }
 
     openModal(els.resultModal);
   }
@@ -752,7 +817,7 @@ const showNotice = (title, text) => {
     try {
       const aiCfg0 = getAiConfig() || {};
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
-      const deck = await geminiGenerateDeck({ topic, count, model, apiKey, qMode });
+      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode });
       const aiCfg = getAiConfig() || {};
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes() }, deck };
       applyPack(pack, {resetDeck:true});
@@ -850,15 +915,21 @@ const showNotice = (title, text) => {
 
 els.resultClose?.addEventListener('click', () => { closeModal(els.resultModal); advanceTurn(); });
 
-els.resultCopy?.addEventListener('click', async () => {
-  const v = (els.resultText && (els.resultText.value ?? els.resultText.textContent)) || '';
-  try { await navigator.clipboard.writeText(String(v)); } catch {}
-});
+if (MODE !== 'teacher') {
+  els.resultCopy?.addEventListener('click', async () => {
+    const v = (els.resultText && (els.resultText.value ?? els.resultText.textContent)) || '';
+    try { await navigator.clipboard.writeText(String(v)); } catch {}
+  });
 
-els.resultDownload?.addEventListener('click', () => {
-  const v = (els.resultText && (els.resultText.value ?? els.resultText.textContent)) || '';
-  downloadText('gemini_raw.txt', String(v), 'text/plain');
-});
+  els.resultDownload?.addEventListener('click', () => {
+    const v = (els.resultText && (els.resultText.value ?? els.resultText.textContent)) || '';
+    downloadText('gemini_raw.txt', String(v), 'text/plain');
+  });
+} else {
+  // Teacher view: remove copy/download buttons
+  els.resultCopy?.remove();
+  els.resultDownload?.remove();
+}
 
   if (MODE === 'teacher') {
     els.applyTopic?.addEventListener('click', onApplyTopic);

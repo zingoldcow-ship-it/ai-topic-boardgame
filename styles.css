@@ -546,3 +546,15 @@ body{
 
 /* Result modal selectable text */
 .resultTextArea{width:100%;min-height:220px;max-height:55vh;resize:vertical;white-space:pre-wrap;word-break:break-word;padding:10px;border:1px solid #ddd;border-radius:10px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:12.5px;line-height:1.35;}
+
+
+/* Result text (answer/explain) readability */
+#resultModal #resultText{
+  font-size:18px;
+  line-height:1.6;
+}
+.resultTextArea{
+  font-size:18px;
+  line-height:1.6;
+  min-height:170px;
+}
