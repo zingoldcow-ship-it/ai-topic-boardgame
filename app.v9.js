@@ -20,6 +20,45 @@
     rows: 6,
   };
 
+  // ---------- sound (WebAudio, no external files) ----------
+  let audioCtx = null;
+  function getAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    return audioCtx;
+  }
+  function tone({freq=440, type='sine', duration=0.12, gain=0.12, when=0}={}){
+    const ctx = getAudio();
+    const t0 = ctx.currentTime + when;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+  function playDiceSound(){
+    // quick rattling effect
+    for (let i=0;i<10;i++) {
+      const f = 220 + Math.random()*520;
+      tone({freq:f, type:'square', duration:0.06, gain:0.06, when:i*0.08});
+    }
+  }
+  function playCorrectSound(){
+    tone({freq:523.25, type:'sine', duration:0.10, gain:0.12, when:0});
+    tone({freq:659.25, type:'sine', duration:0.12, gain:0.12, when:0.10});
+    tone({freq:783.99, type:'sine', duration:0.14, gain:0.12, when:0.20});
+  }
+  function playWrongSound(){
+    tone({freq:220, type:'sawtooth', duration:0.18, gain:0.10, when:0});
+    tone({freq:165, type:'sawtooth', duration:0.22, gain:0.10, when:0.12});
+  }
+
+
   const $ = (id) => document.getElementById(id);
 
   const els = {
@@ -274,7 +313,7 @@ function extractObjectsFromText(text) {
 
   function baseLayout(total) {
     const arr = Array.from({length: total}, () => null);
-    arr[0] = { kind:'start', label:'시작->' };
+    arr[0] = { kind:'start', label:'시작!!' };
     arr[Math.floor(total*0.35)] = ACTION('한 번 쉬기','skip',1);
     arr[Math.floor(total*0.55)] = ACTION('두 칸 앞으로','move', 2);
     arr[Math.floor(total*0.72)] = ACTION('두 칸 뒤로','move',-2);
@@ -309,8 +348,16 @@ function extractObjectsFromText(text) {
       if (cell.kind === 'quiz') el.classList.add('quiz');
 
       const badge = (cell.kind === 'quiz') ? `${cell.label}${cell._n}` : cell.label;
-      const icon = (cell.kind === 'start') ? '🏁'
-        : (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
+      // start tile uses custom markup (start!! + arrow)
+      if (cell.kind === 'start') {
+        el.innerHTML = `<span class="tile-label startBadge"><span class="tile-text">시작!!</span>`+
+          `<svg class="arrowSvg" viewBox="0 0 60 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`+
+          `<path d="M2 10 H48" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`+
+          `<path d="M44 4 L58 10 L44 16" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`+
+          `</svg></span>`;
+        continue;
+      }
+      const icon = (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
         : (cell.kind === 'action' && cell.value > 0) ? '➡️'
         : (cell.kind === 'action' && cell.value < 0) ? '⬅️'
         : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '❓'
@@ -649,6 +696,9 @@ const showNotice = (title, text) => {
 
     const correct = (Number(state.selectedChoice) === Number(q.answerIndex));
 
+    // feedback sound
+    if (correct) playCorrectSound(); else playWrongSound();
+
     if (correct) state.score[state.turn] += 1;
     setScores();
 
@@ -748,10 +798,20 @@ const showNotice = (title, text) => {
       return;
     }
 
+    // dice animation (1~2s) then move + show question
+    els.rollBtn.disabled = true;
+    els.dice?.classList.add('rolling');
+    playDiceSound();
     const n = 1 + Math.floor(Math.random() * 6);
-    els.diceResult.textContent = `주사위: ${n}`;
-    setDiceFace(n);
-    movePlayer(p, n);
+    els.diceResult.textContent = '주사위: ...';
+
+    setTimeout(() => {
+      els.dice?.classList.remove('rolling');
+      els.diceResult.textContent = `주사위: ${n}`;
+      setDiceFace(n);
+      movePlayer(p, n);
+      els.rollBtn.disabled = false;
+    }, 1200);
   }
 
   // ---------- timer ----------
@@ -795,7 +855,7 @@ const showNotice = (title, text) => {
     setScores();
     setTimer();
     drawTokens();
-    logLine('리셋 완료');
+    logLine('다시하기 완료');
   }
 
   // ---------- teacher: apply topic ----------
