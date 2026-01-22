@@ -46,6 +46,7 @@
     roomCodeText: $('roomCodeText'),
     roomQrOverlay: $('roomQrOverlay'),
     roomQrCanvas: $('roomQrCanvas'),
+    roomQrImg: $('roomQrImg'),
     roomQrCodeText: $('roomQrCodeText'),
     closeRoomQr: $('closeRoomQr'),
 
@@ -148,7 +149,15 @@
     }, { merge: true });
   }
 
-  async function createRoom() {
+  
+  async function roomSetConfig(code, config) {
+    if (!db) return;
+    await db.collection(ROOM.collection).doc(code).set({
+      config,
+      updatedAt: Date.now(),
+    }, { merge: true });
+  }
+async function createRoom() {
     if (!db) return null;
     // collision check
     for (let i = 0; i < 10; i++) {
@@ -157,6 +166,12 @@
       const snap = await ref.get();
       if (!snap.exists) {
         await ref.set({ createdAt: Date.now() }, { merge: true });
+        // 초기 설정(활동시간 등)도 방 문서에 저장
+        try {
+          const cfg = getAiConfig();
+          await ref.set({ config: { activityMinutes: getConfiguredMinutes(), model: cfg.model, qMode: cfg.qMode, showAnswer: cfg.showAnswer, deckCount: cfg.deckCount } }, { merge: true });
+        } catch {}
+
         return code;
       }
     }
@@ -227,36 +242,51 @@
 
     function renderRoomQr(link) {
   const canvas = els.roomQrCanvas;
-  if (!canvas) return;
-  // clear
-  const ctx = canvas.getContext && canvas.getContext('2d');
-  if (ctx) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const img = els.roomQrImg;
+
+  // helper: show fallback img (external QR generator)
+  const showImgFallback = () => {
+    if (canvas) canvas.style.display = 'none';
+    if (img) {
+      img.style.display = 'block';
+      img.alt = '학생용 접속 QR';
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(link);
+    }
+  };
+
+  // reset visibility (default: canvas)
+  if (canvas) canvas.style.display = 'block';
+  if (img) img.style.display = 'none';
+
+  // clear canvas
+  if (canvas) {
+    const ctx = canvas.getContext && canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
 
-  const QR = (window.QRCode && (window.QRCode.toCanvas ? window.QRCode : null))
-          || (window.qrcode && (window.qrcode.toCanvas ? window.qrcode : null));
+  const QR =
+    (window.QRCode && (window.QRCode.toCanvas ? window.QRCode : null)) ||
+    (window.qrcode && (window.qrcode.toCanvas ? window.qrcode : null));
 
   if (!QR) {
-    // show a readable fallback so it doesn't look "broken"
-    if (ctx) {
-      ctx.font = '14px sans-serif';
-      ctx.fillText('QR 라이브러리 로드 실패', 20, 40);
-      ctx.fillText('학생 링크 복사로 공유하세요.', 20, 65);
-    }
-    addLog('QR 생성 실패: QRCode 라이브러리가 로드되지 않았습니다. (네트워크 차단/광고차단/혼합콘텐츠 확인)');
+    // Fallback 1: external image (works even if jsdelivr is blocked)
+    showImgFallback();
+    addLog('QR 생성: 라이브러리 로드 실패 → 이미지 방식으로 대체했습니다. (학교망에서 CDN 차단되는 경우가 흔합니다)');
     return;
   }
 
+  // Try canvas QR first, if fails fallback to image
   QR.toCanvas(canvas, link, { width: 220, margin: 1 }, (err) => {
     if (err) {
       console.warn(err);
-      addLog('QR 생성 실패: ' + (err.message || err));
+      addLog('QR 생성 실패: ' + (err.message || err) + ' → 이미지 방식으로 대체합니다.');
+      showImgFallback();
     }
   });
 }
 
-if (els.showRoomQr) {
+if (els.showRoomQr)
+ {
   els.showRoomQr.addEventListener('click', () => {
     if (!isRoomCode(currentRoomCode)) {
       addLog('수업 코드(6자리)가 먼저 필요합니다.');
@@ -283,7 +313,12 @@ if (els.closeRoomQr && els.roomQrOverlay) {
     // 학생은 room 파라미터가 있으면 자동 연결, 없으면 입력 오버레이
     const fbOk = initFirebase();
     const params = new URLSearchParams(window.location.search);
-    const room = params.get('room');
+    let room = params.get('room');
+    // 같은 기기에서 '홈→학생용'으로 이동하면 URL 파라미터가 사라질 수 있어, 마지막 수업 코드를 보조로 사용
+    if (!room) {
+      const saved = localStorage.getItem(ROOM.storageKey);
+      if (isRoomCode(saved)) room = saved;
+    }
 
     const goJoin = () => {
       if (els.joinOverlay) els.joinOverlay.style.display = 'flex';
@@ -338,11 +373,28 @@ if (els.closeRoomQr && els.roomQrOverlay) {
 
     const ref = db.collection(ROOM.collection).doc(room);
     if (roomUnsub) roomUnsub();
+    
     roomUnsub = ref.onSnapshot((snap) => {
-      const data = snap.data();
-      if (data && data.pack) {
+      const data = snap.data() || {};
+
+      // 설정 동기화 (활동시간 등)
+      if (data.config && Number.isFinite(data.config.activityMinutes)) {
+        const m = clamp(Number(data.config.activityMinutes), 1, 180);
+        // pack/settings 보다 우선 적용(실시간 수업용)
+        if (!state.pack) state.pack = { cards: [], settings: {} };
+        if (!state.pack.settings) state.pack.settings = {};
+        state.pack.settings.activityMinutes = m;
+
+        // 타이머 반영(게임 시작 전이면 즉시 반영)
+        if (!state.started) {
+          state.remaining = getConfiguredGameSeconds();
+          setTimer();
+        }
+      }
+
+      // 문제팩 동기화
+      if (data.pack) {
         try {
-          // 교사가 올린 팩을 적용
           saveLastPack(data.pack);
           applyPack(data.pack);
         } catch (e) {
@@ -982,6 +1034,11 @@ const showNotice = (title, text) => {
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
     const activityMinutes = clamp(Number(els.activityMinutes?.value || DEFAULTS.activityMinutes), 1, 180);
     setAiConfig({ model, qMode, showAnswer, deckCount, activityMinutes });
+
+    // 실시간 공유 중이면 학생용에도 설정을 동기화
+    if (MODE === 'teacher' && isRoomCode(currentRoomCode)) {
+      roomSetConfig(currentRoomCode, { model, qMode, showAnswer, deckCount, activityMinutes }).catch(() => {});
+    }
 
     // reflect into current pack (so 학생용 파일에도 반영)
     if (state.pack) {
