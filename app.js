@@ -410,7 +410,7 @@
 
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 2048 },
+      generationConfig: { temperature: 0.6, maxOutputTokens: 2048, responseMimeType: 'application/json' },
     };
 
     const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -434,7 +434,42 @@
           : (Array.isArray(parsed?.questions) ? parsed.questions
             : (Array.isArray(parsed?.items) ? parsed.items : null)));
     } catch {}
-    if (!Array.isArray(arr)) throw new Error('Gemini 응답을 해석할 수 없습니다. (JSON 배열 필요)');
+    if (!Array.isArray(arr)) {
+  // Retry once with a stricter prompt in case the model added explanations or refused in text.
+  const retryPrompt = [
+    '이전 응답은 JSON으로 파싱되지 않았습니다.',
+    '설명/문장/코드펜스 없이, 반드시 JSON 배열만 다시 출력하세요.',
+    '형식: [{"kind":"mcq"|"ox","question":"...","choices":[...],"answerIndex":0,"explain":"..."}]',
+    '',
+    prompt
+  ].join('\n');
+  const retryBody = {
+    contents: [{ role: 'user', parts: [{ text: retryPrompt }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: 'application/json' },
+  };
+  const res2 = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(retryBody) });
+  const raw2 = await res2.text();
+  if (!res2.ok) throw new Error(`Gemini 오류(재시도): ${raw2.slice(0, 400)}`);
+
+  try {
+    const obj2 = JSON.parse(raw2);
+    const parts2 = obj2?.candidates?.[0]?.content?.parts || [];
+    const t2 = parts2.map((p) => p?.text || '').join('').trim();
+    const parsed2 = safeJsonParse(t2);
+    arr = Array.isArray(parsed2) ? parsed2
+      : (Array.isArray(parsed2?.deck) ? parsed2.deck
+        : (Array.isArray(parsed2?.questions) ? parsed2.questions
+          : (Array.isArray(parsed2?.items) ? parsed2.items : null)));
+    if (!Array.isArray(arr)) {
+      throw new Error(`Gemini 응답을 해석할 수 없습니다. (JSON 배열 필요)\n\n--- Gemini 원문(일부) ---\n${t2.slice(0, 600)}`);
+    }
+  } catch (e) {
+    const msg = String(e?.message || e);
+    throw new Error(msg.includes('Gemini 응답을 해석할 수 없습니다')
+      ? msg
+      : `Gemini 응답을 해석할 수 없습니다. (JSON 배열 필요)\n\n--- 원문(일부) ---\n${raw.slice(0, 600)}`);
+  }
+}
 
     const deck = arr.map((it) => {
       const kind = String(it.kind || 'mcq').trim();
