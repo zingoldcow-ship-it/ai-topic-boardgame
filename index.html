@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>주제형 한바퀴 보드게임</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body data-mode="landing">
+  <div class="container">
+    <div class="header">
+      <div class="title">
+        <h1>주제형 한바퀴 보드게임</h1>
+        <p>교사가 AI로 문제를 만들고, 학생은 문제 파일로 게임만 진행합니다.</p>
+      </div>
+    </div>
+
+    <div class="topbar">
+      <b>빠른 시작</b>
+      <span class="sep">|</span>
+      교사용에서 <b>문제 적용</b> → <b>문제 파일 저장</b> → 학생용에서 <b>문제 파일 불러오기</b>
+    </div>
+
+    <div class="main" style="grid-template-columns:1fr;">
+      <div class="card">
+        <h2>어느 화면으로 들어갈까요?</h2>
+        <div class="row">
+          <a class="btn primary" href="./teacher.html">교사용 (문제 만들기)</a>
+          <a class="btn" href="./student.html">학생용 (게임 플레이)</a>
+        </div>
+        <p style="margin:12px 0 0; color:var(--muted); font-size:13px; line-height:1.5;">
+          학생용은 API 키가 필요 없습니다. 교사가 만든 “문제 파일(.json)”만 불러오면 됩니다.
+        </p>
+      </div>
+    </div>
+  </div>
+  <script src="./gate.js"></script>
+  <script>TeacherGate.bindTeacherButton({buttonSelector:"#btnTeacher", teacherUrl:"./teacher.html"});</script>
+</body>
+</html>

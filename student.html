@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>학생용 - 주제형 한바퀴 보드게임</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body data-mode="student">
+  <div class="container">
+    <div class="header">
+      <div class="title">
+        <h1>주제형 한바퀴 보드게임 <span class="badge" id="modeBadge">학생용</span></h1>
+        <p>API 키 없이 “문제 파일”만 불러와서 2명이 번갈아 플레이합니다.</p>
+      </div>
+      <a class="btn small" href="./index.html">홈</a>
+    </div>
+
+    <div class="topbar">
+      <b>학생용 사용</b>
+      <span class="sep">|</span>
+      <b>문제 파일 불러오기</b> → <b>게임 시작하기</b> → 번갈아 <b>주사위 굴리기</b>
+    </div>
+
+    <div class="main">
+      <div class="side">
+        <div class="card">
+          <h2>준비</h2>
+          <div class="badge" data-pack-topic>문제 파일이 없습니다. (불러오기 필요)</div>
+
+          <div style="height:10px"></div>
+          <div class="row">
+            <button class="btn primary" id="importPack">문제 파일 불러오기</button>
+            <input id="importPackInput" type="file" accept=".json,application/json" style="display:none" />
+            <button class="btn" id="exportPack">문제 파일 저장</button>
+          </div>
+          <p style="margin:10px 0 0; color:var(--muted); font-size:13px; line-height:1.5;">
+            파일은 이 기기 안에서만 사용됩니다. (학생 정보는 저장하지 않음)
+          </p>
+
+          <div style="height:12px"></div>
+          <h2>게임</h2>
+          <div class="row">
+            <button class="btn primary" id="startGame">게임 시작하기</button>
+            <button class="btn" id="resetGame">리셋</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h2>로그</h2>
+          <div class="log" id="log"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="padding:12px; margin-bottom:14px;">
+          <div class="scorebox">
+            <div class="badge"><span class="dot red"></span> 빨강: <b class="mono" id="scoreP1">0</b></div>
+            <div class="badge"><span class="dot blue"></span> 파랑: <b class="mono" id="scoreP2">0</b></div>
+            <div class="badge">⏳ <b class="mono" id="timer">07:00</b></div>
+
+            <div class="diceWrap" style="margin-left:auto;">
+              <button class="btn primary" id="rollBtn">주사위 굴리기</button>
+              <div class="dice" id="dice"></div>
+              <div class="badge mono" id="diceResult">주사위: 1</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="boardWrap">
+          <div class="board" id="board" aria-label="board"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="qModal" aria-hidden="true">
+    <div class="backdrop"></div>
+    <div class="panel">
+      <h3 id="qTitle">문제</h3>
+      <p id="qText"></p>
+      <div id="choiceWrap" class="choices"></div>
+      <input id="aInput" placeholder="정답 입력" style="display:none" />
+      <div class="row" style="justify-content:flex-end; margin-top:10px;">
+        <button class="btn" id="aClose">닫기</button>
+        <button class="btn primary" id="aSubmit">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="resultModal" aria-hidden="true">
+    <div class="backdrop"></div>
+    <div class="panel">
+      <h3>결과</h3>
+      <p id="resultText"></p>
+      <div class="row" style="justify-content:flex-end; margin-top:10px;">
+        <button class="btn primary" id="resultClose">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
