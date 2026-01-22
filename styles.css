@@ -232,6 +232,30 @@ body{
   padding:8px 10px;
 }
 .tile-emoji{width:18px; text-align:center; flex:0 0 auto;}
+
+/* START tile readability */
+.startBadge{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.startBadge .tile-text{
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:-0.2px;
+}
+.arrowSvg{
+  width:42px;
+  height:14px;
+  opacity:0.95;
+}
+.arrowSvg path{
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
 .tile-text{
   font-size:15px;
   font-weight:800;
