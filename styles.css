@@ -242,9 +242,12 @@ body{
   gap:6px;
 }
 .startBadge .tile-text{
-  font-size:18px;
+  font-size:16px;
   font-weight:900;
-  letter-spacing:-0.2px;
+  line-height:1;
+  white-space:nowrap;
+  max-width:100%;
+  text-align:center;
 }
 .arrowSvg{
   width:42px;
@@ -590,3 +593,22 @@ body{
   100%{transform:rotate(720deg) scale(1);} 
 }
 .dice.rolling{animation:diceSpin 1.2s ease-in-out;}
+
+
+/* Landing: center and enlarge role buttons */
+body[data-mode="landing"] .landing-card{
+  max-width: 980px;
+  margin: 18px auto 0;
+}
+body[data-mode="landing"] .landing-card h2{
+  font-size: 20px;
+}
+body[data-mode="landing"] .landing-card .row{
+  justify-content: center;
+}
+body[data-mode="landing"] .landing-card .btn{
+  padding: 16px 18px;
+  font-size: 18px;
+  border-radius: 14px;
+  min-width: 220px;
+}
