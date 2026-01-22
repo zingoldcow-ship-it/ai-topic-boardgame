@@ -90,52 +90,50 @@
   // ---------- utils ----------
   const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
 
-  function safeJsonParse(text) {
+function safeJsonParse(text) {
   if (!text) return null;
   let t = String(text).trim();
 
-  // 1) ```json ... ``` code fence extraction
+  // 1) ```json ... ``` code fence extract
   const fence = t.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fence && fence[1]) t = fence[1].trim();
 
   // 2) direct parse
   try { return JSON.parse(t); } catch {}
 
-  // 3) try slice array/object envelope
-  const a0 = t.indexOf('['), a1 = t.lastIndexOf(']');
+  // 3) slice array part
+  const a0 = t.indexOf('[');
+  const a1 = t.lastIndexOf(']');
   if (a0 !== -1 && a1 !== -1 && a1 > a0) {
-    const sub = t.slice(a0, a1 + 1).trim();
-    try { return JSON.parse(sub); } catch {}
-  }
-  const o0 = t.indexOf('{'), o1 = t.lastIndexOf('}');
-  if (o0 !== -1 && o1 !== -1 && o1 > o0) {
-    const sub = t.slice(o0, o1 + 1).trim();
-    try { return JSON.parse(sub); } catch {}
+    try { return JSON.parse(t.slice(a0, a1 + 1)); } catch {}
   }
 
-  // 4) fallback: extract top-level JSON objects {...} and build an array
-  const objs = extractTopLevelJsonObjects(t);
-  if (objs && objs.length) return objs;
+  // 4) slice object part
+  const o0 = t.indexOf('{');
+  const o1 = t.lastIndexOf('}');
+  if (o0 !== -1 && o1 !== -1 && o1 > o0) {
+    try { return JSON.parse(t.slice(o0, o1 + 1)); } catch {}
+  }
 
   return null;
 }
 
-// Extracts top-level JSON objects from noisy text.
-// Useful when the model outputs a sequence of { ... } blocks with stray text between.
-function extractTopLevelJsonObjects(t) {
+// Extract top-level JSON objects from a text (tolerates missing outer array)
+function extractObjectsFromText(text) {
+  if (!text) return null;
+  const t = String(text);
   const out = [];
   let depth = 0;
-  let start = -1;
   let inStr = false;
   let esc = false;
+  let start = -1;
 
   for (let i = 0; i < t.length; i++) {
     const ch = t[i];
-
     if (inStr) {
       if (esc) { esc = false; continue; }
       if (ch === '\\') { esc = true; continue; }
-      if (ch === '"') { inStr = false; continue; }
+      if (ch === '"') { inStr = false; }
       continue;
     } else {
       if (ch === '"') { inStr = true; continue; }
@@ -160,6 +158,334 @@ function extractTopLevelJsonObjects(t) {
   }
 
   return out.length ? out : null;
+}
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+
+  function nowStamp() {
+    const d = new Date();
+    const pad = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function downloadText(filename, content, mime='application/json') {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  function fmtTime(sec) {
+    const m = Math.floor(sec/60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function logLine(msg) {
+    if (!els.log) return;
+    const div = document.createElement('div');
+    div.textContent = msg;
+    els.log.appendChild(div);
+    els.log.scrollTop = els.log.scrollHeight;
+  }
+
+  function getSavedKey() { return localStorage.getItem(STORAGE.geminiKey) || ''; }
+  function setSavedKey(v) { localStorage.setItem(STORAGE.geminiKey, v); }
+  function clearSavedKey() { localStorage.removeItem(STORAGE.geminiKey); }
+
+  function getAiConfig() {
+    const raw = localStorage.getItem(STORAGE.aiConfig);
+    const cfg = raw ? safeJsonParse(raw) : null;
+    return {
+      model: cfg?.model || DEFAULTS.model,
+      qMode: cfg?.qMode || DEFAULTS.qMode,
+      showAnswer: (typeof cfg?.showAnswer === 'boolean') ? cfg.showAnswer : DEFAULTS.showAnswer,
+      deckCount: Number.isFinite(cfg?.deckCount) ? cfg.deckCount : DEFAULTS.deckCount,
+      activityMinutes: Number.isFinite(cfg?.activityMinutes) ? cfg.activityMinutes : DEFAULTS.activityMinutes,
+    };
+  }
+  function setAiConfig(cfg) { localStorage.setItem(STORAGE.aiConfig, JSON.stringify(cfg)); }
+
+
+  function getConfiguredMinutes() {
+    // priority: pack(학생용 배포용) → 저장된 설정(교사용) → 기본값
+    const p = state.pack?.settings?.activityMinutes;
+    const cfg = getAiConfig();
+    const m0 = Number.isFinite(p) ? p : (Number.isFinite(cfg?.activityMinutes) ? cfg.activityMinutes : DEFAULTS.activityMinutes);
+    return clamp(Number(m0), 1, 180);
+  }
+  function getConfiguredGameSeconds() { return getConfiguredMinutes() * 60; }
+
+  function refreshSetupHint() {
+    if (MODE !== 'teacher') return;
+    if (!els.setupHint) return;
+    const hasKey = !!getSavedKey().trim();
+    els.setupHint.style.display = hasKey ? 'none' : 'block';
+  }
+
+
+  function saveLastPack(pack) { localStorage.setItem(STORAGE.savedPack, JSON.stringify(pack)); }
+  function loadLastPack() {
+    const raw = localStorage.getItem(STORAGE.savedPack);
+    return raw ? safeJsonParse(raw) : null;
+  }
+
+  // ---------- board geometry ----------
+  const ROWS = DEFAULTS.rows;
+  const COLS = DEFAULTS.cols;
+
+  function buildGrid() {
+    const grid = {};
+    els.board.innerHTML = '';
+    els.board.style.setProperty('--rows', ROWS);
+    els.board.style.setProperty('--cols', COLS);
+    for (let r=0; r<ROWS; r++) {
+      for (let c=0; c<COLS; c++) {
+        const el = document.createElement('div');
+        el.className = 'cell empty';
+        el.dataset.r = r;
+        el.dataset.c = c;
+        els.board.appendChild(el);
+        grid[`${r}-${c}`] = el;
+      }
+    }
+    return grid;
+  }
+
+  function buildPerimeterPath() {
+    const path = [];
+    for (let c=0; c<COLS; c++) path.push([0,c]);
+    for (let r=1; r<ROWS; r++) path.push([r, COLS-1]);
+    for (let c=COLS-2; c>=0; c--) path.push([ROWS-1, c]);
+    for (let r=ROWS-2; r>=1; r--) path.push([r, 0]);
+    return path;
+  }
+
+  const ACTION = (label, action, value=0) => ({ kind:'action', label, action, value });
+  const QUIZ = (label, qtype) => ({ kind:'quiz', label, qtype });
+
+  function baseLayout(total) {
+    const arr = Array.from({length: total}, () => null);
+    arr[0] = { kind:'start', label:'시작->' };
+    arr[Math.floor(total*0.35)] = ACTION('한 번 쉬기','skip',1);
+    arr[Math.floor(total*0.55)] = ACTION('두 칸 앞으로','move', 2);
+    arr[Math.floor(total*0.72)] = ACTION('두 칸 뒤로','move',-2);
+    arr[Math.floor(total*0.88)] = ACTION('한 번 쉬기','skip',1);
+
+    const quizLabels = [
+      ['핵심','core'], ['정의','def'], ['OX','ox'],
+      ['예시','example'], ['비교','compare'], ['이유','reason'],
+    ];
+    let qi = 0;
+    for (let i=0; i<total; i++) {
+      if (arr[i]) continue;
+      const [lab, qt] = quizLabels[qi % quizLabels.length];
+      qi++;
+      arr[i] = QUIZ(lab, qt);
+    }
+    // number quiz tiles (핵심1 ...)
+    let n = 1;
+    for (let i=0; i<total; i++) if (arr[i].kind === 'quiz') arr[i]._n = n++;
+    return arr;
+  }
+
+  function renderTiles(grid, path, cells) {
+    Object.values(grid).forEach(el => { el.className = 'cell empty'; el.innerHTML=''; });
+    for (let i=0; i<path.length; i++) {
+      const [r,c] = path[i];
+      const el = grid[`${r}-${c}`];
+      const cell = cells[i];
+      el.className = 'cell tile';
+      if (cell.kind === 'start') el.classList.add('start');
+      if (cell.kind === 'action') el.classList.add('action');
+      if (cell.kind === 'quiz') el.classList.add('quiz');
+
+      const badge = (cell.kind === 'quiz') ? `${cell.label}${cell._n}` : cell.label;
+      const icon = (cell.kind === 'start') ? '🏁'
+        : (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
+        : (cell.kind === 'action' && cell.value > 0) ? '➡️'
+        : (cell.kind === 'action' && cell.value < 0) ? '⬅️'
+        : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '❓'
+        : '📝';
+
+      el.innerHTML = `<span class="tile-label"><span class="tile-emoji">${icon}</span><span class="tile-text">${badge}</span></span>`;
+    }
+  }
+
+  const grid = buildGrid();
+  const path = buildPerimeterPath();
+  const cells = baseLayout(path.length);
+  renderTiles(grid, path, cells);
+
+  // ---------- state ----------
+  const state = {
+    started: false,
+    turn: 0,
+    pos: [0,0],
+    score: [0,0],
+    skip: [0,0],
+    remaining: DEFAULTS.gameSeconds,
+    timerId: null,
+
+    pack: null,       // {version, topic, createdAt, model, settings, deck:[]}
+    deckQueues: { mcq: [], ox: [] },
+    deckPos: { mcq: 0, ox: 0 },
+    currentQuestion: null,
+  };
+
+  function setModeBadge() {
+    if (els.modeBadge) els.modeBadge.textContent = (MODE === 'teacher') ? '교사용' : '학생용';
+  }
+  setModeBadge();
+
+  function setScores() {
+    if (els.scoreP1) els.scoreP1.textContent = state.score[0];
+    if (els.scoreP2) els.scoreP2.textContent = state.score[1];
+  }
+  function setTimer() {
+    if (els.timer) els.timer.textContent = fmtTime(state.remaining);
+  }
+
+  function clearTokens() { document.querySelectorAll('.token').forEach(el => el.remove()); }
+  function drawTokens() {
+    clearTokens();
+    for (let p=0; p<2; p++) {
+      const idx = state.pos[p];
+      const [r,c] = path[idx];
+      const el = grid[`${r}-${c}`];
+      const t = document.createElement('span');
+      t.className = `token ${p===0?'red':'blue'}`;
+      el.appendChild(t);
+    }
+  }
+  setScores(); setTimer(); drawTokens();
+
+  // ---------- pack import/export ----------
+  function validatePack(pack) {
+    if (!pack || typeof pack !== 'object') return {ok:false, msg:'파일 형식이 올바르지 않습니다.'};
+    if (!pack.topic) return {ok:false, msg:'주제(topic)가 없습니다.'};
+    if (!Array.isArray(pack.deck) || pack.deck.length === 0) return {ok:false, msg:'문제 목록(deck)이 없습니다.'};
+
+    for (const it of pack.deck) {
+      const kind = String(it.kind || 'mcq').toLowerCase();
+      if (!it.question || !Array.isArray(it.choices)) return {ok:false, msg:'문제 형식이 올바르지 않습니다.'};
+      if (kind === 'ox') {
+        if (it.choices.length !== 2) return {ok:false, msg:'OX 문제 choices는 2개여야 합니다.'};
+        if (!(it.answerIndex === 0 || it.answerIndex === 1)) return {ok:false, msg:'OX answerIndex가 올바르지 않습니다.'};
+      } else {
+        if (it.choices.length !== 4) return {ok:false, msg:'4지선다 choices는 4개여야 합니다.'};
+        if (!(it.answerIndex >= 0 && it.answerIndex <= 3)) return {ok:false, msg:'answerIndex가 올바르지 않습니다.'};
+      }
+    }
+
+    // settings optional
+    if (!pack.settings) pack.settings = { showAnswer: true, qMode: 'mcq', activityMinutes: DEFAULTS.activityMinutes };
+    if (!Number.isFinite(pack.settings.activityMinutes)) pack.settings.activityMinutes = DEFAULTS.activityMinutes;
+    return {ok:true};
+  }
+
+  function applyPack(pack, {resetDeck=true}={}) {
+    state.pack = pack;
+
+    // rebuild queues for deck consumption
+    const mcq = [];
+    const ox = [];
+    (pack.deck || []).forEach((it) => {
+      const kind = String(it.kind || 'mcq').toLowerCase();
+      if (kind === 'ox') ox.push(it);
+      else mcq.push(it);
+    });
+    state.deckQueues = { mcq, ox };
+    if (resetDeck) state.deckPos = { mcq: 0, ox: 0 };
+
+    const topicLine = document.querySelector('[data-pack-topic]');
+    if (topicLine) topicLine.textContent = `문제: ${pack.topic} (총 ${pack.deck.length}문항)`;
+
+    if (!state.started) {
+      state.remaining = getConfiguredGameSeconds();
+      setTimer();
+    }
+
+    logLine(`문제 파일 적용: ${pack.topic} / ${pack.deck.length}문항`);
+  }
+
+  function exportCurrentPack() {
+    if (!state.pack) {
+      alert('저장할 문제 파일이 없습니다. (교사: 먼저 문제 적용 / 학생: 파일 불러오기)');
+      return;
+    }
+    // ensure exported pack includes timer setting
+    const cfg = getAiConfig();
+    if (!state.pack.settings) state.pack.settings = {};
+    state.pack.settings.activityMinutes = Number.isFinite(state.pack.settings.activityMinutes) ? state.pack.settings.activityMinutes : clamp(Number(cfg.activityMinutes), 1, 180);
+
+    const name = `주제형_보드게임_문제_${(state.pack.topic||'topic').replace(/\s+/g,'_')}_${nowStamp().slice(0,10)}.json`;
+    downloadText(name, JSON.stringify(state.pack, null, 2));
+  }
+
+  // ---------- gemini (teacher) ----------
+  async function geminiGenerateDeck({topic, count, model, apiKey, qMode}) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const prompt = [
+      '당신은 초등 5~6학년 수업용 4지선다 퀴즈 제작자입니다.',
+      '주어진 주제로 보드게임에서 학생 2명이 풀 수 있는 짧은 문제를 만듭니다.',
+      '반드시 JSON 배열만 출력합니다(다른 텍스트 금지).',
+      '스키마(4지선다): { "kind":"mcq", "question":"...", "choices":["...","...","...","..."], "answerIndex":0~3, "explain":"(1~2문장)" }',
+      '스키마(OX): { "kind":"ox", "question":"...", "choices":["O","X"], "answerIndex":0~1, "explain":"(1~2문장)" }',
+      'choices에는 정답이 하나만 있도록 구성하고, answerIndex는 정답 보기의 인덱스입니다.',
+      '',
+      `주제: ${topic}`,
+      `개수: ${count}`,
+      `문항 구성: ${qMode === 'mcq_ox' ? '4지선다 중심 + 일부 OX 포함' : '4지선다만'}`,
+      '언어: 한국어',
+      '난이도: 초등 5~6학년 수준',
+    ].join('\n');
+
+const body = {
+  contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  generationConfig: { temperature: 0.6, maxOutputTokens: 2048, responseMimeType: 'application/json' },
+};
+
+const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+const raw = await res.text();
+
+if (!res.ok) {
+  if (res.status === 429) throw new Error('Gemini 사용 한도(Quota/Rate limit)로 요청이 차단되었습니다. AI Studio에서 결제/할당량 상태를 확인하세요.');
+  if (raw.includes('overloaded')) throw new Error('Gemini 모델이 혼잡합니다. 잠시 후 다시 시도하세요.');
+  throw new Error(`Gemini 오류: ${raw.slice(0, 400)}`);
+}
+
+// Extract model text
+let t = '';
+try {
+  const obj = JSON.parse(raw);
+  const parts = obj?.candidates?.[0]?.content?.parts || [];
+  t = parts.map(p => p?.text || '').join('').trim();
+} catch {}
+
+// Parse JSON (array preferred). If broken, recover objects.
+let parsed = safeJsonParse(t);
+let arr = Array.isArray(parsed) ? parsed
+        : Array.isArray(parsed?.questions) ? parsed.questions
+        : Array.isArray(parsed?.deck) ? parsed.deck
+        : Array.isArray(parsed?.items) ? parsed.items
+        : null;
+
+if (!Array.isArray(arr)) {
+  const objs = extractObjectsFromText(t);
+  if (Array.isArray(objs) && objs.length) arr = objs;
+}
+
+if (!Array.isArray(arr)) {
+  throw new Error('Gemini 응답을 해석할 수 없습니다. (JSON 배열 필요)\n\n--- Gemini 원문(일부) ---\n' + String(t).slice(0, 900));
 }
 
     const deck = arr.map((it) => {
@@ -218,8 +544,8 @@ const showNotice = (title, text) => {
   const titleEl = $('#resultTitle') || modal?.querySelector('h3');
   const textEl = $('#resultText');
   if (titleEl) titleEl.textContent = title || '안내';
-    if (textEl) {
-    if (textEl.tagName === 'TEXTAREA') textEl.value = text || '';
+  if (textEl) {
+    if (textEl.tagName === 'TEXTAREA' || 'value' in textEl) textEl.value = text || '';
     else textEl.textContent = text || '';
   }
   openModal(modal);
@@ -433,8 +759,7 @@ const showNotice = (title, text) => {
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
     } catch (e) {
-      const msg = String(e?.message || e);
-      showNotice("오류", msg);
+      alert(String(e?.message || e));
     } finally {
       els.applyTopic.disabled = false;
       els.applyTopic.textContent = '문제 적용';
@@ -491,8 +816,7 @@ const showNotice = (title, text) => {
       await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode });
       alert('연결 성공!');
     } catch (e) {
-      const msg = String(e?.message || e);
-      showNotice("오류", msg);
+      alert(String(e?.message || e));
     }
   }
 
@@ -523,50 +847,18 @@ const showNotice = (title, text) => {
 
   els.aSubmit?.addEventListener('click', gradeAnswer);
   els.aClose?.addEventListener('click', () => { closeModal(els.qModal); advanceTurn(); });
-  // result modal helpers (copy / download)
-  function getResultText() {
-    const el = els.resultText;
-    if (!el) return '';
-    return (el.tagName === 'TEXTAREA') ? (el.value || '') : (el.textContent || '');
-  }
-  function downloadText(filename, text) {
-    try{
-      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      alert('다운로드에 실패했습니다.');
-    }
-  }
 
-  els.resultCopy?.addEventListener('click', async () => {
-    const text = getResultText();
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      // simple feedback
-      alert('복사했습니다.');
-    } catch (e) {
-      // fallback: select text for manual copy
-      const el = els.resultText;
-      if (el && el.tagName === 'TEXTAREA') { el.focus(); el.select(); }
-      alert('자동 복사가 차단되었습니다. 텍스트가 선택되면 복사(Ctrl/Cmd+C)하세요.');
-    }
-  });
+els.resultClose?.addEventListener('click', () => { closeModal(els.resultModal); advanceTurn(); });
 
-  els.resultDownload?.addEventListener('click', () => {
-    const text = getResultText();
-    if (!text) return;
-    downloadText('gemini_raw.txt', text);
-  });
+els.resultCopy?.addEventListener('click', async () => {
+  const v = (els.resultText && (els.resultText.value ?? els.resultText.textContent)) || '';
+  try { await navigator.clipboard.writeText(String(v)); } catch {}
+});
 
-  els.resultClose?.addEventListener('click', () => { closeModal(els.resultModal); advanceTurn(); });
+els.resultDownload?.addEventListener('click', () => {
+  const v = (els.resultText && (els.resultText.value ?? els.resultText.textContent)) || '';
+  downloadText('gemini_raw.txt', String(v), 'text/plain');
+});
 
   if (MODE === 'teacher') {
     els.applyTopic?.addEventListener('click', onApplyTopic);
