@@ -244,45 +244,21 @@ async function createRoom() {
   const canvas = els.roomQrCanvas;
   const img = els.roomQrImg;
 
-  // helper: show fallback img (external QR generator)
-  const showImgFallback = () => {
-    if (canvas) canvas.style.display = 'none';
-    if (img) {
-      img.style.display = 'block';
-      img.alt = '학생용 접속 QR';
-      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(link);
-    }
-  };
+  // Prefer image-based QR (works without any JS QR library; 학교망에서 CDN 차단 이슈 회피)
+  if (canvas) canvas.style.display = 'none';
+  if (img) {
+    img.style.display = 'block';
+    img.alt = '학생용 접속 QR';
 
-  // reset visibility (default: canvas)
-  if (canvas) canvas.style.display = 'block';
-  if (img) img.style.display = 'none';
+    const google = 'https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=' + encodeURIComponent(link);
+    const backup = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(link);
 
-  // clear canvas
-  if (canvas) {
-    const ctx = canvas.getContext && canvas.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // googleapis가 막힌 경우를 대비해 1회 백업
+    img.onerror = () => { img.onerror = null; img.src = backup; };
+    img.src = google;
+  } else {
+    addLog('QR 표시 실패: roomQrImg 요소를 찾지 못했습니다.');
   }
-
-  const QR =
-    (window.QRCode && (window.QRCode.toCanvas ? window.QRCode : null)) ||
-    (window.qrcode && (window.qrcode.toCanvas ? window.qrcode : null));
-
-  if (!QR) {
-    // Fallback 1: external image (works even if jsdelivr is blocked)
-    showImgFallback();
-    addLog('QR 생성: 라이브러리 로드 실패 → 이미지 방식으로 대체했습니다. (학교망에서 CDN 차단되는 경우가 흔합니다)');
-    return;
-  }
-
-  // Try canvas QR first, if fails fallback to image
-  QR.toCanvas(canvas, link, { width: 220, margin: 1 }, (err) => {
-    if (err) {
-      console.warn(err);
-      addLog('QR 생성 실패: ' + (err.message || err) + ' → 이미지 방식으로 대체합니다.');
-      showImgFallback();
-    }
-  });
 }
 
 if (els.showRoomQr)
@@ -377,13 +353,16 @@ if (els.closeRoomQr && els.roomQrOverlay) {
     roomUnsub = ref.onSnapshot((snap) => {
       const data = snap.data() || {};
 
-      // 설정 동기화 (활동시간 등)
-      if (data.config && Number.isFinite(data.config.activityMinutes)) {
-        const m = clamp(Number(data.config.activityMinutes), 1, 180);
-        // pack/settings 보다 우선 적용(실시간 수업용)
+      // room config minutes (teacher setting)
+      const roomMinutes = (data.config && Number.isFinite(data.config.activityMinutes))
+        ? clamp(Number(data.config.activityMinutes), 1, 180)
+        : null;
+
+      // 설정 동기화 (활동시간 등) - roomMinutes가 있으면 pack보다 우선
+      if (roomMinutes != null) {
         if (!state.pack) state.pack = { cards: [], settings: {} };
         if (!state.pack.settings) state.pack.settings = {};
-        state.pack.settings.activityMinutes = m;
+        state.pack.settings.activityMinutes = roomMinutes;
 
         // 타이머 반영(게임 시작 전이면 즉시 반영)
         if (!state.started) {
@@ -395,8 +374,14 @@ if (els.closeRoomQr && els.roomQrOverlay) {
       // 문제팩 동기화
       if (data.pack) {
         try {
-          saveLastPack(data.pack);
-          applyPack(data.pack);
+          
+// room config가 있으면 pack.settings보다 우선 적용
+if (roomMinutes != null) {
+  if (!data.pack.settings) data.pack.settings = {};
+  data.pack.settings.activityMinutes = roomMinutes;
+}
+saveLastPack(data.pack);
+applyPack(data.pack);
         } catch (e) {
           console.warn(e);
         }
