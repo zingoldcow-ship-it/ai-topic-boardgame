@@ -568,6 +568,8 @@ body{
 
 /* guide topbar (teacher) */
 .topbar.guide{
+  background:#f6fbe8;
+  border-color:#d9f2b8;
   flex-direction:column;
   align-items:flex-start;
   gap:6px;
