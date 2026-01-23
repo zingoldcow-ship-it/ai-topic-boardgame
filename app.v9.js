@@ -467,12 +467,19 @@ function extractObjectsFromText(text) {
       const idx = state.pos[p];
       const [r,c] = path[idx];
       const el = grid[`${r}-${c}`];
+
+      // Use robot images (CSS background-image)
       const t = document.createElement('span');
       t.className = `token ${p===0?'red':'blue'}`;
+      t.setAttribute('aria-hidden','true');
       el.appendChild(t);
     }
   }
   setScores(); setTimer(); drawTokens();
+  // init board center topic text
+  const _ct = document.getElementById('centerTopicText');
+  if (_ct && MODE==='teacher') _ct.textContent = (els.topicInput?.value || '').trim() || '주제를 입력하세요';
+  if (_ct && MODE!=='teacher') _ct.textContent = (state.pack?.topic || '주제를 입력하세요');
 
   // ---------- pack import/export ----------
   function validatePack(pack) {
@@ -514,6 +521,10 @@ function extractObjectsFromText(text) {
 
     const topicLine = document.querySelector('[data-pack-topic]');
     if (topicLine) topicLine.textContent = `문제: ${pack.topic} (총 ${pack.deck.length}문항)`;
+
+    const centerText = document.getElementById('centerTopicText');
+    if (centerText) centerText.textContent = pack.topic || '';
+
 
     if (!state.started) {
       state.remaining = getConfiguredGameSeconds();
@@ -1117,6 +1128,15 @@ if (MODE !== 'teacher') {
 
   if (MODE === 'teacher') {
     els.applyTopic?.addEventListener('click', onApplyTopic);
+    // live preview of topic on board center (before applying)
+    els.topicInput?.addEventListener('input', () => {
+      const t = (els.topicInput.value || '').trim();
+      const centerText = document.getElementById('centerTopicText');
+      if (!centerText) return;
+      if (state.pack && state.pack.topic) return; // keep applied topic
+      centerText.textContent = t || '주제를 입력하세요';
+    });
+
 
     els.settingsBtn?.addEventListener('click', openDrawer);
     els.openSettingsInline?.addEventListener('click', openDrawer);

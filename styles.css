@@ -272,13 +272,23 @@ body{
 
 .token{
   position:absolute;
-  width:14px;height:14px;border-radius:50%;
-  border:2px solid #fff;
-  top:8px; left:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,.2);
+  width:44px;height:44px;
+  top:50%; left:50%;
+  transform:translate(-70%,-70%);
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:contain;
+  pointer-events:none;
+  filter:drop-shadow(0 4px 10px rgba(0,0,0,.18));
 }
-.token.blue{background:var(--blue); left:28px;}
-.token.red{background:var(--red);}
+.token.blue{
+  transform:translate(-30%,-30%);
+  background-image:url('./robot-blue.png');
+}
+.token.red{
+  background-image:url('./robot-red.png');
+}
+
 
 .log{
   max-height:160px;
@@ -684,3 +694,39 @@ body[data-mode="landing"] .landing-card .btn{
 @media (max-width: 720px){
   .boardBanner .bannerCard{ font-size:34px; padding:18px 20px; }
 }
+
+
+/* ---------- board center topic card ---------- */
+.centerTopicCard{
+  position:absolute;
+  inset:50% auto auto 50%;
+  transform:translate(-50%,-50%);
+  width:min(520px, 62%);
+  max-width:62%;
+  background:#fff7e6; /* ivory */
+  border:1px solid rgba(148,163,184,.65);
+  border-radius:18px;
+  padding:16px 18px;
+  text-align:center;
+  box-shadow:0 14px 34px rgba(2,6,23,.10);
+  pointer-events:none;
+}
+.centerTopicTitle{
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.02em;
+  color:#7c2d12;
+  margin-bottom:6px;
+}
+.centerTopicText{
+  font-size:30px; /* 크게 */
+  font-weight:900;
+  line-height:1.15;
+  color:#0f172a;
+  word-break:keep-all;
+}
+@media (max-width: 900px){
+  .centerTopicText{ font-size:24px; }
+}
+
+.subtitle{margin-top:6px;color:#475569;font-weight:700;}
