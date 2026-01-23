@@ -136,72 +136,90 @@
       <button class="btn small x" id="closeSettings">닫기</button>
       <h2>설정</h2>
 
-      <div class="help">아래 옵션들을 설정하세요.</div>
-
       <hr/>
 
-      <div class="stack">
+      <div class="settingCards">
 
-        <div>
-          <div class="setting-label">Gemini API 키</div>
-          <input id="apiKeyInput" type="password" placeholder="AIza..." />
-          <div class="row" style="margin-top:10px;">
-            <button class="btn softYellow" id="getKeyBtn" type="button">API 키 발급받기(구글)</button>
+        <section class="settingCard cardA">
+          <div class="settingCardHeader">
+            <div class="settingCardTitle">AI 연결 설정</div>
+            <div class="settingCardDesc">아래 옵션들을 설정하세요.</div>
           </div>
-          <div class="help" style="margin-top:8px;">키는 이 브라우저(PC)에만 저장됩니다. 다른 PC에서는 다시 입력해야 합니다.</div>
-        </div>
 
-        <div class="row actions">
-          <button class="btn softBlue" id="saveKey">키 저장</button>
-          <button class="btn softPink" id="deleteKey">키 삭제</button>
-          <button class="btn" id="testAi">AI 연결 테스트</button>
-        </div>
+          <div class="formGroup">
+            <div class="setting-label">Gemini API 키</div>
+            <input id="apiKeyInput" type="password" placeholder="AIza..." />
+            <div class="row" style="margin-top:10px;">
+              <button class="btn softYellow" id="getKeyBtn" type="button">API 키 발급받기(구글)</button>
+            </div>
+            <div class="help" style="margin-top:8px;">키는 이 브라우저(PC)에만 저장됩니다. 다른 PC에서는 다시 입력해야 합니다.</div>
+          </div>
 
-        <div>
-          <div class="setting-label">모델</div>
-          <select id="geminiModel">
-            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-          </select>
-        </div>
+          <div class="row actions">
+            <button class="btn softBlue" id="saveKey">키 저장</button>
+            <button class="btn softPink" id="deleteKey">키 삭제</button>
+            <button class="btn" id="testAi">AI 연결 테스트</button>
+          </div>
+        </section>
 
+        <section class="settingCard cardB">
+          <div class="settingCardHeader">
+            <div class="settingCardTitle">문제 생성 설정</div>
+            <div class="settingCardDesc">필요한 형식과 난이도를 정합니다.</div>
+          </div>
 
-        <div>
-          <div class="setting-label">문항 유형</div>
-          <select id="qMode">
-            <option value="mcq">4지선다</option>
-            <option value="mcq_ox">4지선다+ ox퀴즈</option>
-          </select>
-          <div class="help">기본은 4지선다입니다. OX를 함께 생성할 수도 있습니다.</div>
-        </div>
+          <div class="formGrid">
+            <div class="formGroup">
+              <div class="setting-label">모델</div>
+              <select id="geminiModel">
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+              </select>
+            </div>
 
-        <div>
-          <label class="setting-check" style="margin-top:6px;">
-            <input id="showAnswer" type="checkbox" checked />
-            <span>학생 화면에서 정답/해설 공개</span>
-          </label>
-          <div class="help">끄면 학생은 정오답만 확인하고 정답/해설은 보지 못합니다.</div>
-        </div>
+            <div class="formGroup">
+              <div class="setting-label">문항 유형</div>
+              <select id="qMode">
+                <option value="mcq">4지선다</option>
+                <option value="mcq_ox">4지선다+ ox퀴즈</option>
+              </select>
+              <div class="help">기본은 4지선다입니다. OX를 함께 생성할 수도 있습니다.</div>
+            </div>
+          </div>
 
+          <div class="formGroup">
+            <label class="setting-check" style="margin-top:6px;">
+              <input id="showAnswer" type="checkbox" checked />
+              <span>학생 화면에서 정답/해설 공개</span>
+            </label>
+            <div class="help">끄면 학생은 정오답만 확인하고 정답/해설은 보지 못합니다.</div>
+          </div>
+        </section>
 
-        <div>
-          <div class="setting-label">문제 수 <span class="setting-sub">(덱 총 문항 수)</span></div>
-          <input id="deckCount" type="number" min="6" max="200" value="30" />
-          <div class="help">덱 소진형: 게임 중 문제칸에 도착할 때마다 다음 문제가 출제됩니다.</div>
-        </div>
+        <section class="settingCard cardC">
+          <div class="settingCardHeader">
+            <div class="settingCardTitle">게임 진행 설정</div>
+            <div class="settingCardDesc">게임 흐름(문항 수/시간)을 정합니다.</div>
+          </div>
 
+          <div class="formGrid">
+            <div class="formGroup">
+              <div class="setting-label">문제 수 <span class="setting-sub">(덱 총 문항 수)</span></div>
+              <input id="deckCount" type="number" min="6" max="200" value="30" />
+              <div class="help">덱 소진형: 문제칸 도착 시 다음 문제가 출제됩니다.</div>
+            </div>
 
+            <div class="formGroup">
+              <div class="setting-label">활동시간 <span class="setting-sub">(분)</span></div>
+              <input id="activityMinutes" type="number" min="1" max="180" value="7" />
+              <div class="help">게임 시작 시 타이머가 이 시간으로 설정됩니다.</div>
+            </div>
+          </div>
 
-
-        <div>
-          <div class="setting-label">활동시간 <span class="setting-sub">(분)</span></div>
-          <input id="activityMinutes" type="number" min="1" max="180" value="7" />
-          <div class="help">게임 시작 시 타이머가 이 시간으로 설정됩니다. (학생용에도 문제 파일에 함께 저장됨)</div>
-        </div>
-
-        <div class="row">
-          <button class="btn primary" id="saveAi">설정 저장</button>
-        </div>
+          <div class="row">
+            <button class="btn primary" id="saveAi">설정 저장</button>
+          </div>
+        </section>
       </div>
 
       <hr/>
