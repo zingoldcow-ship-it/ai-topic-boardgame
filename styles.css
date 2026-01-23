@@ -189,6 +189,7 @@ body{
 }
 
 .boardWrap{
+  position:relative;
   background:var(--card);
   border:1px solid var(--line);
   border-radius:18px;
@@ -611,4 +612,39 @@ body[data-mode="landing"] .landing-card .btn{
   font-size: 18px;
   border-radius: 14px;
   min-width: 220px;
+}
+
+
+/* --- Board banner (e.g., skip turn) --- */
+.boardBanner{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+  z-index:50;
+}
+.boardBanner .bannerCard{
+  background:rgba(255,255,255,.92);
+  border:2px solid rgba(15,23,42,.12);
+  box-shadow:0 20px 50px rgba(2,6,23,.20);
+  border-radius:18px;
+  padding:22px 28px;
+  font-weight:900;
+  font-size:44px;
+  letter-spacing:-.02em;
+  color:#0f172a;
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.boardBanner .bannerSub{
+  font-size:18px;
+  font-weight:700;
+  color:#475569;
+  margin-top:6px;
+}
+@media (max-width: 720px){
+  .boardBanner .bannerCard{ font-size:34px; padding:18px 20px; }
 }

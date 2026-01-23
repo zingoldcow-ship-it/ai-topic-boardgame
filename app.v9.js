@@ -555,7 +555,8 @@ if (!Array.isArray(arr)) {
       if (kind === 'ox') {
         const c = (choices.length === 2) ? choices : ['O','X'];
         // allow 0/1 or 1/2
-        if (ai === 1 || ai === 2) ai = ai - 1;
+        // Prefer 0-based (0/1). If ai===2, it's clearly 1-based second choice -> convert.
+        if (ai === 2) ai = 1;
         if (!(ai === 0 || ai === 1)) ai = 0;
         return { kind:'ox', question, choices: c, answerIndex: ai, explain };
       }
@@ -563,7 +564,12 @@ if (!Array.isArray(arr)) {
       // mcq
       if (choices.length !== 4) return null;
 
-      if (ai === 1 || ai === 2 || ai === 3 || ai === 4) ai = ai - 1; // 1-based -> 0-based
+      // Prefer 0-based (0~3). Some outputs may be 1-based (1~4).
+      // Heuristic:
+      // - ai === 4  -> clearly 1-based, convert to 3
+      // - ai === 0  -> clearly 0-based
+      // - ai in 1~3 -> ambiguous; keep as-is (assume 0-based) to avoid off-by-one errors.
+      if (ai === 4) ai = 3;
       if (!(ai >= 0 && ai <= 3)) return null;
 
       return { kind:'mcq', question, choices, answerIndex: ai, explain };
@@ -646,6 +652,36 @@ const showNotice = (title, text) => {
     else textEl.textContent = text || '';
   }
   openModal(modal);
+};
+
+
+
+const showBoardBanner = (mainText, subText = '', ms = 1200) => {
+  const wrap = document.querySelector('.boardWrap');
+  if (!wrap) return;
+  // remove existing
+  wrap.querySelectorAll('.boardBanner').forEach(n => n.remove());
+
+  const banner = document.createElement('div');
+  banner.className = 'boardBanner';
+  banner.innerHTML = `
+    <div class="bannerCard">
+      <span>${escapeHtml(String(mainText || ''))}</span>
+    </div>
+  `;
+  wrap.appendChild(banner);
+
+  if (subText) {
+    const card = banner.querySelector('.bannerCard');
+    const sub = document.createElement('div');
+    sub.className = 'bannerSub';
+    sub.textContent = String(subText);
+    card.appendChild(sub);
+  }
+
+  window.setTimeout(() => {
+    try { banner.remove(); } catch {}
+  }, ms);
 };
 
 
@@ -767,8 +803,10 @@ const showNotice = (title, text) => {
       if (cell.action === 'skip') {
         state.skip[p] += 1;
         logLine(`${p===0?'빨강':'파랑'} : 한 번 쉬기`);
+        // Big on-board banner so students can immediately notice the skip
+        showBoardBanner('한 번 쉬기', '이번 턴은 쉽니다.', 1400);
         showNotice('⏸️ 한 번 쉬기', '이번 턴은 쉽니다. 다음 차례로 넘어갑니다.');
-        advanceTurn();
+        window.setTimeout(() => advanceTurn(), 1400);
         return;
       }
       if (cell.action === 'move') {
