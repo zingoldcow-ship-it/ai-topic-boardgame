@@ -20,6 +20,45 @@
     rows: 6,
   };
 
+  // ---------- sound (WebAudio, no external files) ----------
+  let audioCtx = null;
+  function getAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    return audioCtx;
+  }
+  function tone({freq=440, type='sine', duration=0.12, gain=0.12, when=0}={}){
+    const ctx = getAudio();
+    const t0 = ctx.currentTime + when;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+  function playDiceSound(){
+    // quick rattling effect
+    for (let i=0;i<10;i++) {
+      const f = 220 + Math.random()*520;
+      tone({freq:f, type:'square', duration:0.06, gain:0.06, when:i*0.08});
+    }
+  }
+  function playCorrectSound(){
+    tone({freq:523.25, type:'sine', duration:0.10, gain:0.12, when:0});
+    tone({freq:659.25, type:'sine', duration:0.12, gain:0.12, when:0.10});
+    tone({freq:783.99, type:'sine', duration:0.14, gain:0.12, when:0.20});
+  }
+  function playWrongSound(){
+    tone({freq:220, type:'sawtooth', duration:0.18, gain:0.10, when:0});
+    tone({freq:165, type:'sawtooth', duration:0.22, gain:0.10, when:0.12});
+  }
+
+
   const $ = (id) => document.getElementById(id);
 
   const els = {
@@ -89,6 +128,65 @@
 
   // ---------- utils ----------
   const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
+
+  function escapeRegExp(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  function normalizeForMatch(s){
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\s+/g,'')
+      .replace(/[“”"'\u2019\u2018]/g,'')
+      .replace(/[.,!?，。]/g,'');
+  }
+
+  function extractAnswerToken(explain){
+    const t = String(explain || '').trim();
+    // e.g., "정답: 3/10", "답은 16입니다"
+    const m = t.match(/(?:정답|답)\s*[:：]?\s*([^\s,。\.\n]+)/);
+    return m ? m[1].trim() : '';
+  }
+
+  function inferAnswerIndexFromExplain(explain, choices){
+    if (!explain || !Array.isArray(choices)) return -1;
+    const ex = String(explain);
+    const token = extractAnswerToken(ex);
+    if (token) {
+      const ti = normalizeForMatch(token);
+      for (let i=0;i<choices.length;i++){
+        if (normalizeForMatch(choices[i]) === ti) return i;
+      }
+    }
+
+    // direct mention search (prefer exact tokens / fractions / decimals)
+    const exNorm = normalizeForMatch(ex);
+    const hits = [];
+    for (let i=0;i<choices.length;i++){
+      const c = String(choices[i] ?? '');
+      const cTrim = c.trim();
+      if (!cTrim) continue;
+
+      // Use boundary-aware regex on raw explain where possible (avoid "1" matching "10")
+      const escaped = escapeRegExp(cTrim);
+      const re = new RegExp(`(^|[^0-9A-Za-z가-힣])${escaped}([^0-9A-Za-z가-힣]|$)`);
+      if (re.test(ex)) { hits.push(i); continue; }
+
+      // fallback to normalized substring (handles minor spacing)
+      const cNorm = normalizeForMatch(cTrim);
+      if (cNorm && exNorm.includes(cNorm) && cNorm.length >= 2) hits.push(i);
+    }
+    if (hits.length === 1) return hits[0];
+
+    return -1;
+  }
+
+  function fixAnswerIndexByExplain(q){
+    if (!q || q.kind !== 'mcq') return q;
+    if (!Array.isArray(q.choices) || q.choices.length !== 4) return q;
+    const inferred = inferAnswerIndexFromExplain(q.explain, q.choices);
+    if (inferred >= 0 && inferred <= 3) q.answerIndex = inferred;
+    return q;
+  }
+
 
 function safeJsonParse(text) {
   if (!text) return null;
@@ -274,7 +372,7 @@ function extractObjectsFromText(text) {
 
   function baseLayout(total) {
     const arr = Array.from({length: total}, () => null);
-    arr[0] = { kind:'start', label:'시작->' };
+    arr[0] = { kind:'start', label:'시작!!' };
     arr[Math.floor(total*0.35)] = ACTION('한 번 쉬기','skip',1);
     arr[Math.floor(total*0.55)] = ACTION('두 칸 앞으로','move', 2);
     arr[Math.floor(total*0.72)] = ACTION('두 칸 뒤로','move',-2);
@@ -309,8 +407,16 @@ function extractObjectsFromText(text) {
       if (cell.kind === 'quiz') el.classList.add('quiz');
 
       const badge = (cell.kind === 'quiz') ? `${cell.label}${cell._n}` : cell.label;
-      const icon = (cell.kind === 'start') ? '🏁'
-        : (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
+      // start tile uses custom markup (start!! + arrow)
+      if (cell.kind === 'start') {
+        el.innerHTML = `<span class="tile-label startBadge"><span class="tile-text">시작!!</span>`+
+          `<svg class="arrowSvg" viewBox="0 0 60 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`+
+          `<path d="M2 10 H48" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`+
+          `<path d="M44 4 L58 10 L44 16" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`+
+          `</svg></span>`;
+        continue;
+      }
+      const icon = (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
         : (cell.kind === 'action' && cell.value > 0) ? '➡️'
         : (cell.kind === 'action' && cell.value < 0) ? '⬅️'
         : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '❓'
@@ -508,7 +614,8 @@ if (!Array.isArray(arr)) {
       if (kind === 'ox') {
         const c = (choices.length === 2) ? choices : ['O','X'];
         // allow 0/1 or 1/2
-        if (ai === 1 || ai === 2) ai = ai - 1;
+        // Prefer 0-based (0/1). If ai===2, it's clearly 1-based second choice -> convert.
+        if (ai === 2) ai = 1;
         if (!(ai === 0 || ai === 1)) ai = 0;
         return { kind:'ox', question, choices: c, answerIndex: ai, explain };
       }
@@ -516,11 +623,19 @@ if (!Array.isArray(arr)) {
       // mcq
       if (choices.length !== 4) return null;
 
-      if (ai === 1 || ai === 2 || ai === 3 || ai === 4) ai = ai - 1; // 1-based -> 0-based
+      // Prefer 0-based (0~3). Some outputs may be 1-based (1~4).
+      // Heuristic:
+      // - ai === 4  -> clearly 1-based, convert to 3
+      // - ai === 0  -> clearly 0-based
+      // - ai in 1~3 -> ambiguous; keep as-is (assume 0-based) to avoid off-by-one errors.
+      if (ai === 4) ai = 3;
       if (!(ai >= 0 && ai <= 3)) return null;
 
       return { kind:'mcq', question, choices, answerIndex: ai, explain };
     }).filter(Boolean);
+
+    // post-fix: align answerIndex with explanation when model is inconsistent
+    deck.forEach((q)=>{ try{ fixAnswerIndexByExplain(q); }catch(e){} });
 
     if (deck.length === 0) throw new Error('생성된 문제가 없습니다.');
     return deck;
@@ -531,35 +646,60 @@ if (!Array.isArray(arr)) {
   async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode }) {
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
-    // Heuristic batch size: keeps outputs within token limits even with explanations.
+    // batch size to stay within token limits
     const batchSize = Math.min(16, target);
     const out = [];
     const seen = new Set();
 
     // hard stop to avoid infinite loops
     let guard = 0;
-    while (out.length < target && guard < 10) {
+    while (out.length < target && guard < 30) {
       guard++;
       const remain = target - out.length;
       const n = Math.min(batchSize, remain);
 
-      // Ask Gemini to continue with new questions (avoid duplicates).
-      const deckPart = await geminiGenerateDeck({ topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만)`, count: n, model, apiKey, qMode });
+      const deckPart = await geminiGenerateDeck({
+        topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만, 남은 개수: ${n}개)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
+        count: n,
+        model,
+        apiKey,
+        qMode
+      });
 
       for (const q of deckPart) {
         const key = (q.kind + '|' + q.question).slice(0, 200);
         if (seen.has(key)) continue;
         seen.add(key);
+        try { fixAnswerIndexByExplain(q); } catch(e) {}
         out.push(q);
         if (out.length >= target) break;
       }
 
-      // If we failed to add enough (too many invalid/duplicate), reduce batch to recover
-      if (deckPart.length === 0) break;
-      if (deckPart.length < Math.max(3, Math.floor(n / 2)) && batchSize > 8) {
-        // (best-effort) shrink batch next round
+      // if Gemini returned nothing usable, stop
+      if (!deckPart || deckPart.length === 0) break;
+    }
+
+    // Final strict fill if still short
+    if (out.length < target) {
+      const remain = target - out.length;
+      const deckPart = await geminiGenerateDeck({
+        topic: `${topic}\n(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만. explain 1문장)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
+        count: remain,
+        model,
+        apiKey,
+        qMode
+      });
+
+      for (const q of deckPart) {
+        const key = (q.kind + '|' + q.question).slice(0, 200);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        try { fixAnswerIndexByExplain(q); } catch(e) {}
+        out.push(q);
+        if (out.length >= target) break;
       }
     }
+
     return out.slice(0, target);
   }
 
@@ -599,6 +739,36 @@ const showNotice = (title, text) => {
     else textEl.textContent = text || '';
   }
   openModal(modal);
+};
+
+
+
+const showBoardBanner = (mainText, subText = '', ms = 1200) => {
+  const wrap = document.querySelector('.boardWrap');
+  if (!wrap) return;
+  // remove existing
+  wrap.querySelectorAll('.boardBanner').forEach(n => n.remove());
+
+  const banner = document.createElement('div');
+  banner.className = 'boardBanner';
+  banner.innerHTML = `
+    <div class="bannerCard">
+      <span>${escapeHtml(String(mainText || ''))}</span>
+    </div>
+  `;
+  wrap.appendChild(banner);
+
+  if (subText) {
+    const card = banner.querySelector('.bannerCard');
+    const sub = document.createElement('div');
+    sub.className = 'bannerSub';
+    sub.textContent = String(subText);
+    card.appendChild(sub);
+  }
+
+  window.setTimeout(() => {
+    try { banner.remove(); } catch {}
+  }, ms);
 };
 
 
@@ -648,6 +818,9 @@ const showNotice = (title, text) => {
     }
 
     const correct = (Number(state.selectedChoice) === Number(q.answerIndex));
+
+    // feedback sound
+    if (correct) playCorrectSound(); else playWrongSound();
 
     if (correct) state.score[state.turn] += 1;
     setScores();
@@ -717,8 +890,10 @@ const showNotice = (title, text) => {
       if (cell.action === 'skip') {
         state.skip[p] += 1;
         logLine(`${p===0?'빨강':'파랑'} : 한 번 쉬기`);
+        // Big on-board banner so students can immediately notice the skip
+        showBoardBanner('한 번 쉬기', '이번 턴은 쉽니다.', 1400);
         showNotice('⏸️ 한 번 쉬기', '이번 턴은 쉽니다. 다음 차례로 넘어갑니다.');
-        advanceTurn();
+        window.setTimeout(() => advanceTurn(), 1400);
         return;
       }
       if (cell.action === 'move') {
@@ -748,10 +923,20 @@ const showNotice = (title, text) => {
       return;
     }
 
+    // dice animation (1~2s) then move + show question
+    els.rollBtn.disabled = true;
+    els.dice?.classList.add('rolling');
+    playDiceSound();
     const n = 1 + Math.floor(Math.random() * 6);
-    els.diceResult.textContent = `주사위: ${n}`;
-    setDiceFace(n);
-    movePlayer(p, n);
+    els.diceResult.textContent = '주사위: ...';
+
+    setTimeout(() => {
+      els.dice?.classList.remove('rolling');
+      els.diceResult.textContent = `주사위: ${n}`;
+      setDiceFace(n);
+      movePlayer(p, n);
+      els.rollBtn.disabled = false;
+    }, 1200);
   }
 
   // ---------- timer ----------
@@ -795,7 +980,7 @@ const showNotice = (title, text) => {
     setScores();
     setTimer();
     drawTokens();
-    logLine('리셋 완료');
+    logLine('다시하기 완료');
   }
 
   // ---------- teacher: apply topic ----------

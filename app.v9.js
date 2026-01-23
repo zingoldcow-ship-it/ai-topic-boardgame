@@ -129,6 +129,65 @@
   // ---------- utils ----------
   const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
 
+  function escapeRegExp(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  function normalizeForMatch(s){
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\s+/g,'')
+      .replace(/[“”"'\u2019\u2018]/g,'')
+      .replace(/[.,!?，。]/g,'');
+  }
+
+  function extractAnswerToken(explain){
+    const t = String(explain || '').trim();
+    // e.g., "정답: 3/10", "답은 16입니다"
+    const m = t.match(/(?:정답|답)\s*[:：]?\s*([^\s,。\.\n]+)/);
+    return m ? m[1].trim() : '';
+  }
+
+  function inferAnswerIndexFromExplain(explain, choices){
+    if (!explain || !Array.isArray(choices)) return -1;
+    const ex = String(explain);
+    const token = extractAnswerToken(ex);
+    if (token) {
+      const ti = normalizeForMatch(token);
+      for (let i=0;i<choices.length;i++){
+        if (normalizeForMatch(choices[i]) === ti) return i;
+      }
+    }
+
+    // direct mention search (prefer exact tokens / fractions / decimals)
+    const exNorm = normalizeForMatch(ex);
+    const hits = [];
+    for (let i=0;i<choices.length;i++){
+      const c = String(choices[i] ?? '');
+      const cTrim = c.trim();
+      if (!cTrim) continue;
+
+      // Use boundary-aware regex on raw explain where possible (avoid "1" matching "10")
+      const escaped = escapeRegExp(cTrim);
+      const re = new RegExp(`(^|[^0-9A-Za-z가-힣])${escaped}([^0-9A-Za-z가-힣]|$)`);
+      if (re.test(ex)) { hits.push(i); continue; }
+
+      // fallback to normalized substring (handles minor spacing)
+      const cNorm = normalizeForMatch(cTrim);
+      if (cNorm && exNorm.includes(cNorm) && cNorm.length >= 2) hits.push(i);
+    }
+    if (hits.length === 1) return hits[0];
+
+    return -1;
+  }
+
+  function fixAnswerIndexByExplain(q){
+    if (!q || q.kind !== 'mcq') return q;
+    if (!Array.isArray(q.choices) || q.choices.length !== 4) return q;
+    const inferred = inferAnswerIndexFromExplain(q.explain, q.choices);
+    if (inferred >= 0 && inferred <= 3) q.answerIndex = inferred;
+    return q;
+  }
+
+
 function safeJsonParse(text) {
   if (!text) return null;
   let t = String(text).trim();
@@ -575,6 +634,9 @@ if (!Array.isArray(arr)) {
       return { kind:'mcq', question, choices, answerIndex: ai, explain };
     }).filter(Boolean);
 
+    // post-fix: align answerIndex with explanation when model is inconsistent
+    deck.forEach((q)=>{ try{ fixAnswerIndexByExplain(q); }catch(e){} });
+
     if (deck.length === 0) throw new Error('생성된 문제가 없습니다.');
     return deck;
   }
@@ -584,35 +646,60 @@ if (!Array.isArray(arr)) {
   async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode }) {
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
-    // Heuristic batch size: keeps outputs within token limits even with explanations.
+    // batch size to stay within token limits
     const batchSize = Math.min(16, target);
     const out = [];
     const seen = new Set();
 
     // hard stop to avoid infinite loops
     let guard = 0;
-    while (out.length < target && guard < 10) {
+    while (out.length < target && guard < 30) {
       guard++;
       const remain = target - out.length;
       const n = Math.min(batchSize, remain);
 
-      // Ask Gemini to continue with new questions (avoid duplicates).
-      const deckPart = await geminiGenerateDeck({ topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만)`, count: n, model, apiKey, qMode });
+      const deckPart = await geminiGenerateDeck({
+        topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만, 남은 개수: ${n}개)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
+        count: n,
+        model,
+        apiKey,
+        qMode
+      });
 
       for (const q of deckPart) {
         const key = (q.kind + '|' + q.question).slice(0, 200);
         if (seen.has(key)) continue;
         seen.add(key);
+        try { fixAnswerIndexByExplain(q); } catch(e) {}
         out.push(q);
         if (out.length >= target) break;
       }
 
-      // If we failed to add enough (too many invalid/duplicate), reduce batch to recover
-      if (deckPart.length === 0) break;
-      if (deckPart.length < Math.max(3, Math.floor(n / 2)) && batchSize > 8) {
-        // (best-effort) shrink batch next round
+      // if Gemini returned nothing usable, stop
+      if (!deckPart || deckPart.length === 0) break;
+    }
+
+    // Final strict fill if still short
+    if (out.length < target) {
+      const remain = target - out.length;
+      const deckPart = await geminiGenerateDeck({
+        topic: `${topic}\n(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만. explain 1문장)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
+        count: remain,
+        model,
+        apiKey,
+        qMode
+      });
+
+      for (const q of deckPart) {
+        const key = (q.kind + '|' + q.question).slice(0, 200);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        try { fixAnswerIndexByExplain(q); } catch(e) {}
+        out.push(q);
+        if (out.length >= target) break;
       }
     }
+
     return out.slice(0, target);
   }
 
