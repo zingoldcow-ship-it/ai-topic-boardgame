@@ -9,6 +9,14 @@
     authed: 'TOPIC_BOARDGAME_TEACHER_AUTH_V1',
   };
 
+
+  const RESET_KEYS = [
+    'TOPIC_BOARDGAME_AI_CONFIG_V2',
+    'TOPIC_BOARDGAME_AI_CONFIG_V1',
+    'TOPIC_BOARDGAME_PACK_V2',
+    'TOPIC_BOARDGAME_STATE_V1',
+  ];
+
   const DEFAULT_SETUP_KEY = 'abcd1234';
 
   const $ = (sel, root=document) => root.querySelector(sel);
@@ -55,7 +63,7 @@
           </div>
           <div class="keypad" id="keypad"></div>
           <div class="row" style="margin-top:10px; justify-content:space-between; align-items:center;">
-            <button class="btn" id="gateResetBtn" type="button">패스코드 초기화</button>
+            <button class="btn" id="gateResetBtn" type="button">관리자 초기화</button>
             <button class="btn primary" id="gatePassOk" type="button">확인</button>
           </div>
         </div>
@@ -157,6 +165,7 @@
     let pin1 = '';
     let pin2 = '';
     let pendingSetupKeyOk = false;
+    let isResetFlow = false;
 
     // init pin UIs
     makePinDisplay($('#pinDisplay', modal));
@@ -236,6 +245,7 @@
 
     // handlers
     $('#gateToPassEnter', modal).onclick = () => {
+      isResetFlow = false;
       if (!getHasPass()){
         setMsg('아직 패스코드가 설정되지 않았습니다. 먼저 초기 설정키로 설정을 진행하세요.', true);
         return;
@@ -252,6 +262,18 @@
       if (v !== DEFAULT_SETUP_KEY){
         setMsg('초기 설정키가 올바르지 않습니다.', true); return;
       }
+
+      if (isResetFlow){
+        // Clear teacher auth + AI config so a different teacher can start fresh on the same device.
+        try {
+          localStorage.removeItem(LS.passHash);
+          localStorage.removeItem(LS.gateDone);
+          RESET_KEYS.forEach(k => localStorage.removeItem(k));
+        } catch (e) {}
+        try { sessionStorage.removeItem(SS.authed); } catch (e) {}
+        isResetFlow = false;
+      }
+
       localStorage.setItem(LS.gateDone, '1');
       goto('setPass1');
       setMsg(stepMsg.setPass1);
@@ -275,6 +297,7 @@
         return;
       }
       sessionStorage.setItem(SS.authed, '1');
+      isResetFlow = false;
       setBodyLocked(false);
       closeModal(modal);
       onAuthed && onAuthed();
@@ -282,8 +305,9 @@
 
     $('#gateResetBtn', modal).onclick = () => {
       // require setup key again
+      isResetFlow = true;
       goto('setupKey');
-      setMsg('패스코드를 초기화하려면 초기 설정키를 입력하세요.');
+      setMsg('관리자 초기화를 진행합니다. 초기 설정키를 입력하면 교사용 비밀번호와 AI API 키, 설정값이 초기화됩니다.');
     };
 
     $('#gateSet1Next', modal).onclick = () => {
@@ -312,6 +336,7 @@
       const h = await sha256Hex(pin1);
       localStorage.setItem(LS.passHash, h);
       sessionStorage.setItem(SS.authed, '1');
+      isResetFlow = false;
       setBodyLocked(false);
       closeModal(modal);
       onAuthed && onAuthed();
