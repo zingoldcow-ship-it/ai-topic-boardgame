@@ -11,6 +11,8 @@
 
 
   const RESET_KEYS = [
+    // API key (stored separately from AI config)
+    'GEMINI_API_KEY',
     'TOPIC_BOARDGAME_AI_CONFIG_V2',
     'TOPIC_BOARDGAME_AI_CONFIG_V1',
     'TOPIC_BOARDGAME_PACK_V2',
@@ -62,9 +64,29 @@
             <div class="pin-hint" id="pinHint">6자리 숫자 패스코드를 입력하세요.</div>
           </div>
           <div class="keypad" id="keypad"></div>
-          <div class="row" style="margin-top:10px; justify-content:space-between; align-items:center;">
-            <button class="btn" id="gateResetBtn" type="button">관리자 초기화</button>
+
+          <div class="row" style="margin-top:10px; justify-content:flex-end;">
             <button class="btn primary" id="gatePassOk" type="button">확인</button>
+          </div>
+
+          <div class="resetCard" aria-label="관리자 초기화">
+            <div class="resetCardTitle">관리자 초기화</div>
+            <div class="resetCardDesc">공용 PC에서 다른 선생님이 사용하실 때, 초기화 후 새로 시작하세요.</div>
+            <button class="btn" id="gateResetBtn" type="button">초기화</button>
+          </div>
+
+          <div class="gate-confirm" id="gateConfirm" aria-hidden="true">
+            <div class="gate-confirm__backdrop"></div>
+            <div class="gate-confirm__panel" role="dialog" aria-modal="true" aria-labelledby="gateConfirmTitle">
+              <h4 id="gateConfirmTitle" style="margin:0 0 8px;">정말 초기화하시겠습니까?</h4>
+              <div class="gate-confirm__text">
+                초기화하면 <b>교사용 비밀번호</b>, <b>Gemini API 키</b>, <b>설정값</b>이 삭제됩니다.
+              </div>
+              <div class="row" style="justify-content:flex-end; margin-top:10px;">
+                <button class="btn" id="gateConfirmCancel" type="button">취소</button>
+                <button class="btn danger" id="gateConfirmOk" type="button">초기화</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -156,6 +178,9 @@
     const modal = ensureModal();
     const msg = $('#gateMsg', modal);
     const closeBtn = $('#gateCloseBtn', modal);
+    const confirmWrap = $('#gateConfirm', modal);
+    const confirmCancel = $('#gateConfirmCancel', modal);
+    const confirmOk = $('#gateConfirmOk', modal);
 
     // close control
     closeBtn.style.display = allowClose ? '' : 'none';
@@ -181,6 +206,17 @@
     function setMsg(text, isError=false){
       msg.textContent = text || '';
       msg.style.color = isError ? '#b91c1c' : 'var(--muted)';
+    }
+
+    function openConfirm(){
+      if (!confirmWrap) return;
+      confirmWrap.classList.add('open');
+      confirmWrap.setAttribute('aria-hidden','false');
+    }
+    function closeConfirm(){
+      if (!confirmWrap) return;
+      confirmWrap.classList.remove('open');
+      confirmWrap.setAttribute('aria-hidden','true');
     }
 
     function resetPin(){
@@ -304,11 +340,20 @@
     };
 
     $('#gateResetBtn', modal).onclick = () => {
+      // confirm first (avoid accidental reset)
+      openConfirm();
+    };
+
+    confirmCancel && (confirmCancel.onclick = () => closeConfirm());
+    confirmOk && (confirmOk.onclick = () => {
+      closeConfirm();
       // require setup key again
       isResetFlow = true;
       goto('setupKey');
-      setMsg('관리자 초기화를 진행합니다. 초기 설정키를 입력하면 교사용 비밀번호와 AI API 키, 설정값이 초기화됩니다.');
-    };
+      setMsg('관리자 초기화를 진행합니다. 초기 설정키를 입력하면 교사용 비밀번호, Gemini API 키, 설정값이 초기화됩니다.');
+    });
+
+    confirmWrap && confirmWrap.querySelector('.gate-confirm__backdrop')?.addEventListener('click', closeConfirm);
 
     $('#gateSet1Next', modal).onclick = () => {
       if (pin1.length !== 6){

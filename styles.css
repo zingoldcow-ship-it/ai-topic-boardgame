@@ -619,6 +619,60 @@ body{
 }
 .keypad-btn:active{transform:translateY(1px);}
 
+/* Gate: admin reset emphasis */
+.resetCard{
+  margin-top:12px;
+  padding:12px;
+  border-radius:14px;
+  background:#fff7e6; /* light ivory */
+  border:1px solid rgba(251,191,36,.85); /* amber */
+  box-shadow:0 6px 18px rgba(2,6,23,.06);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.resetCardTitle{
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:-0.2px;
+  color:#7c2d12;
+}
+.resetCardDesc{
+  font-size:13px;
+  line-height:1.45;
+  color:#92400e;
+}
+
+/* Gate: confirm overlay inside gate modal */
+.gate-confirm{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:1200;
+}
+.gate-confirm.open{display:flex;}
+.gate-confirm__backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(15,23,42,.45);
+}
+.gate-confirm__panel{
+  position:relative;
+  width:min(440px, 92vw);
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:0 18px 50px rgba(2,6,23,.22);
+}
+.gate-confirm__text{
+  font-size:13px;
+  line-height:1.5;
+  color:var(--muted);
+}
+
 
 /* Result modal selectable text */
 .resultTextArea{width:100%;min-height:220px;max-height:55vh;resize:vertical;white-space:pre-wrap;word-break:break-word;padding:10px;border:1px solid #ddd;border-radius:10px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:12.5px;line-height:1.35;}
