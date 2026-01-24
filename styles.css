@@ -5,7 +5,8 @@
   --text:#0f172a;
   --muted:#64748b;
   --line:#e2e8f0;
-  --blue:#2563eb;
+  --blue:#3A6FE0;
+  --green:#2FAF7A;
   --red:#ef4444;
   --radius:16px;
 
@@ -786,3 +787,17 @@ body[data-mode="landing"] .landing-card .btn{
 }
 
 .subtitle{margin-top:6px;color:#475569;font-weight:700;}
+
+
+.btn.secondary{
+  background:#EAF0FB;
+  border-color:#3A6FE0;
+  color:#3A6FE0;
+}
+.btn.save{
+  background:var(--green);
+  border-color:var(--green);
+  color:#ffffff;
+}
+.btn.teacher{background:#3A6FE0; border-color:#3A6FE0; color:white;}
+.btn.student{background:#2FAF7A; border-color:#2FAF7A; color:white;}
