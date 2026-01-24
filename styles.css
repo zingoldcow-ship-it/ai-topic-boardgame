@@ -808,3 +808,7 @@ body[data-mode="landing"] .landing-card .btn{
 .btn.teacher:hover{filter:brightness(.95);} 
 .btn.student{background:var(--green); border-color:var(--green); color:white;}
 .btn.student:hover{filter:brightness(.95);} 
+
+
+.btn.softBlue:hover{filter:brightness(.97);}
+.btn.softPink:hover{filter:brightness(.97);}
