@@ -5,7 +5,8 @@
   --text:#0f172a;
   --muted:#64748b;
   --line:#e2e8f0;
-  --blue:#3A6FE0;
+  /* primary blue (softer than previous deep blue) */
+  --blue:#4A7FE8;
   --green:#2FAF7A;
   --red:#ef4444;
   --radius:16px;
@@ -78,7 +79,9 @@ body{
   gap:8px;
 }
 .btn.primary{background:var(--blue); border-color:var(--blue); color:white;}
+.btn.primary:hover{filter:brightness(.95);} 
 .btn.danger{background:#dc2626; border-color:#dc2626; color:white;}
+.btn.danger:hover{filter:brightness(.95);} 
 .btn.small{padding:8px 10px; border-radius:10px; font-size:15px;}
 .btn:disabled{opacity:.6; cursor:not-allowed;}
 
@@ -791,13 +794,17 @@ body[data-mode="landing"] .landing-card .btn{
 
 .btn.secondary{
   background:#EAF0FB;
-  border-color:#3A6FE0;
-  color:#3A6FE0;
+  border-color:var(--blue);
+  color:var(--blue);
 }
+.btn.secondary:hover{filter:brightness(.97);} 
 .btn.save{
   background:var(--green);
   border-color:var(--green);
   color:#ffffff;
 }
-.btn.teacher{background:#3A6FE0; border-color:#3A6FE0; color:white;}
-.btn.student{background:#2FAF7A; border-color:#2FAF7A; color:white;}
+.btn.save:hover{filter:brightness(.95);} 
+.btn.teacher{background:var(--blue); border-color:var(--blue); color:white;}
+.btn.teacher:hover{filter:brightness(.95);} 
+.btn.student{background:var(--green); border-color:var(--green); color:white;}
+.btn.student:hover{filter:brightness(.95);} 
