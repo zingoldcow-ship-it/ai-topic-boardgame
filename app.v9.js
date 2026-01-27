@@ -536,7 +536,7 @@ function extractObjectsFromText(text) {
 
   function exportCurrentPack() {
     if (!state.pack) {
-      alert('저장할 문제 파일이 없습니다. (교사: 먼저 문제 적용 / 학생: 파일 불러오기)');
+      alert('저장할 문제 파일이 없습니다. (교사: 먼저 문제 생성 / 학생: 파일 불러오기)');
       return;
     }
     // ensure exported pack includes timer setting
@@ -786,7 +786,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   
   function askQuestion(kindWanted='mcq') {
     const q = nextQuestion(kindWanted);
-    if (!q) { alert('문제 파일이 없습니다. (교사: 문제 적용 / 학생: 문제 파일 불러오기)'); return; }
+    if (!q) { alert('문제 파일이 없습니다. (교사: 문제 생성 / 학생: 문제 파일 불러오기)'); return; }
     if (q._depleted) { alert('문제 덱이 모두 소진되었습니다.'); return; }
 
     state.currentQuestion = q;
@@ -1022,7 +1022,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       alert(String(e?.message || e));
     } finally {
       els.applyTopic.disabled = false;
-      els.applyTopic.textContent = '문제 적용';
+      els.applyTopic.textContent = '문제 생성';
     }
   }
 
@@ -1064,6 +1064,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       state.remaining = getConfiguredGameSeconds();
       setTimer();
     }
+    closeDrawer();
     alert('설정을 저장했습니다.');
   }
 
@@ -1139,9 +1140,7 @@ if (MODE !== 'teacher') {
 
 
     els.settingsBtn?.addEventListener('click', openDrawer);
-    els.openSettingsInline?.addEventListener('click', openDrawer);
-    els.closeSettings?.addEventListener('click', closeDrawer);
-    els.drawer?.querySelector('.drawer__backdrop')?.addEventListener('click', closeDrawer);
+    els.openSettingsInline?.addEventListener('click', openDrawer);    els.drawer?.querySelector('.drawer__backdrop')?.addEventListener('click', closeDrawer);
 
     els.saveKey?.addEventListener('click', onSaveKey);
     els.deleteKey?.addEventListener('click', onDeleteKey);

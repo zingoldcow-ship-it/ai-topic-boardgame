@@ -15,18 +15,27 @@
       </div>
     </div>
 
-    <div class="topbar">
-      <b>빠른 시작</b>
-      <span class="sep">|</span>
-      교사용에서 <b>문제 생성</b> → <b>문제 파일 저장</b> → 학생용에서 <b>문제 파일 불러오기</b>
+    <div class="topbar guide">
+      <div class="guideTitle">사용방법</div>
+      <div class="guideSteps">
+        1) <b>설정</b>에서 Gemini API 키 발급·저장 및 옵션 세팅
+        <span class="sep">→</span>
+        2) <b>주제 입력</b>
+        <span class="sep">→</span>
+        3) <b>문제 생성</b>(작동 확인)
+        <span class="sep">→</span>
+        4) <b>문제 파일 저장</b>
+        <span class="sep">→</span>
+        5) 학생에게 배부 (<b>학생용</b>에서 <b>문제 파일 불러오기</b>)
+      </div>
     </div>
 
-    <div class="main" style="grid-template-columns:1fr;">
+<div class="main" style="grid-template-columns:1fr;">
       <div class="card landing-card">
         <h2>어느 화면으로 들어갈까요?</h2>
-        <div class="row landingActions">
-          <a class="btn teacher" href="./teacher.html">교사용 (문제 만들기)</a>
-          <a class="btn student" href="./student.html">학생용 (게임 플레이)</a>
+        <div class="landingActions">
+          <a class="btn teacher roleCard" href="./teacher.html">교사용 (문제 만들기)</a>
+          <a class="btn student roleCard" href="./student.html">학생용 (게임 플레이)</a>
         </div>
         <p style="margin:12px 0 0; color:var(--muted); font-size:13px; line-height:1.5;">
           학생용은 API 키가 필요 없습니다. 교사가 만든 문제가 자동 적용되어 바로 게임을 시작할 수 있고, 필요하면 “문제 파일(.json)”을 불러올 수도 있습니다.</p>

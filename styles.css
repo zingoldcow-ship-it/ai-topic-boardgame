@@ -8,6 +8,8 @@
   /* primary blue (softer than previous deep blue) */
   --blue:#4A7FE8;
   --green:#2FAF7A;
+  --ivory:#fff4d6;
+  --lavender:#f5efff;
   --red:#ef4444;
   --radius:16px;
 
@@ -158,12 +160,6 @@ body{
   border:1px dashed var(--line);
   padding:8px 10px;
   border-radius:999px;
-}
-
-/* Teacher - applied pack summary badge */
-.badge[data-pack-topic]{
-  background:#f6f0ff; /* very light purple */
-  border-color:#e4d7ff;
 }
 
 .scorebox{
@@ -481,11 +477,10 @@ body{
   color:#1e40af;
 }
 
-/* Soft ivory button (teacher '문제 생성') */
 .btn.softIvory{
-  background:#fff7e6;
-  border-color:#f3e1b8;
-  color:#7a5a00;
+  background:var(--ivory);
+  border-color:#f2d799;
+  color:#7a4a00;
 }
 
 .btn.softYellow{
@@ -605,6 +600,8 @@ body{
   justify-content:flex-end;
   flex-wrap:nowrap;
 }
+.packBadge{background:var(--lavender); border-color:#d8c7ff;}
+
 .muted{ color: var(--muted); }
 
 /* Teacher gate */
@@ -723,19 +720,25 @@ body[data-mode="landing"] .landing-card{
 body[data-mode="landing"] .landing-card h2{
   font-size: 20px;
 }
-body[data-mode="landing"] .landing-card .row.landingActions{
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 14px;
-  max-width: 560px;
-  margin: 0 auto;
+body[data-mode="landing"] .landingActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-top:10px;
 }
-body[data-mode="landing"] .landing-card .landingActions .btn{
-  width: 100%;
-  padding: 22px 18px;
+body[data-mode="landing"] .landingActions .roleCard{
+  width:100%;
+  min-height:92px;
+}
+@media (max-width: 720px){
+  body[data-mode="landing"] .landingActions{grid-template-columns:1fr;}
+}
+
+body[data-mode="landing"] .landing-card .btn{
+  padding: 24px 18px;
   font-size: 20px;
   border-radius: 18px;
+  min-width: 0;
 }
 
 
@@ -829,5 +832,4 @@ body[data-mode="landing"] .landing-card .landingActions .btn{
 
 
 .btn.softBlue:hover{filter:brightness(.97);}
-.btn.softIvory:hover{filter:brightness(.98);}
 .btn.softPink:hover{filter:brightness(.97);}
