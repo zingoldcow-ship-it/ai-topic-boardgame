@@ -7,6 +7,9 @@
     geminiKey: 'GEMINI_API_KEY',
     aiConfig: 'TOPIC_BOARDGAME_AI_CONFIG_V2',
     savedPack: 'TOPIC_BOARDGAME_PACK_V2',
+    collectorUrl: 'TOPIC_BG_COLLECTOR_URL',
+    sessionCode: 'TOPIC_BG_SESSION_CODE',
+    teamName: 'TOPIC_BG_TEAM_NAME',
   };
 
   const DEFAULTS = {
@@ -88,6 +91,20 @@
     exportPack: $('exportPack'),
     importPack: $('importPack'),
     importPackInput: $('importPackInput'),
+
+    // collector (optional)
+    collectorUrlInput: $('collectorUrlInput'),
+    sessionCodeInput: $('sessionCodeInput'),
+    teamNameInput: $('teamNameInput'),
+    saveCollector: $('saveCollector'),
+
+    // teacher dashboard
+    newSessionCode: $('newSessionCode'),
+    copySessionInfo: $('copySessionInfo'),
+    refreshResults: $('refreshResults'),
+    generateFeedback: $('generateFeedback'),
+    resultLog: $('resultLog'),
+    collectorHint: $('collectorHint'),
 
     // modals
     qModal: $('qModal'),
@@ -445,12 +462,71 @@ function extractObjectsFromText(text) {
     deckQueues: { mcq: [], ox: [] },
     deckPos: { mcq: 0, ox: 0 },
     currentQuestion: null,
+    attempts: [],
+    collector: { url:'', session:'', team:'' },
   };
 
   function setModeBadge() {
     if (els.modeBadge) els.modeBadge.textContent = (MODE === 'teacher') ? '교사용' : '학생용';
   }
   setModeBadge();
+
+  // ---------- optional collector (Apps Script / webhook) ----------
+  function randCode(len=6){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let out = '';
+    for (let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];
+    return out;
+  }
+
+  function loadCollectorCfg(){
+    state.collector.url = (localStorage.getItem(STORAGE.collectorUrl) || '').trim();
+    state.collector.session = (localStorage.getItem(STORAGE.sessionCode) || '').trim();
+    state.collector.team = (localStorage.getItem(STORAGE.teamName) || '').trim();
+    if (els.collectorUrlInput) els.collectorUrlInput.value = state.collector.url;
+    if (els.sessionCodeInput) els.sessionCodeInput.value = state.collector.session;
+    if (els.teamNameInput) els.teamNameInput.value = state.collector.team;
+  }
+
+  function saveCollectorCfg(){
+    const url = (els.collectorUrlInput?.value || '').trim();
+    const session = (els.sessionCodeInput?.value || '').trim();
+    const team = (els.teamNameInput?.value || '').trim();
+
+    localStorage.setItem(STORAGE.collectorUrl, url);
+    localStorage.setItem(STORAGE.sessionCode, session);
+    localStorage.setItem(STORAGE.teamName, team);
+
+    state.collector.url = url;
+    state.collector.session = session;
+    state.collector.team = team;
+  }
+
+  async function postCollector(eventType, payload){
+    const url = state.collector.url;
+    const session = state.collector.session;
+    const team = state.collector.team;
+    if (!url || !session || !team) return;
+
+    const body = { ts: Date.now(), session, team, eventType, ...payload };
+
+    try{
+      await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }catch(e){
+      // best-effort only
+      logLine('⚠️ 결과 전송 실패(네트워크/URL 확인)');
+    }
+  }
+
+  async function fetchSessionSummary(){
+    const url = (els.collectorUrlInput?.value || '').trim();
+    const session = (els.sessionCodeInput?.value || '').trim();
+    if (!url || !session) return null;
+    const u = url + (url.includes('?') ? '&' : '?') + 'session=' + encodeURIComponent(session);
+    const res = await fetch(u);
+    return await res.json();
+  }
+
 
   function setScores() {
     if (els.scoreP1) els.scoreP1.textContent = state.score[0];
@@ -511,7 +587,8 @@ function extractObjectsFromText(text) {
     // rebuild queues for deck consumption
     const mcq = [];
     const ox = [];
-    (pack.deck || []).forEach((it) => {
+    (pack.deck || []).forEach((it, idx) => {
+      if (it && it._qid == null) it._qid = String(it.id || (idx+1));
       const kind = String(it.kind || 'mcq').toLowerCase();
       if (kind === 'ox') ox.push(it);
       else mcq.push(it);
@@ -650,6 +727,24 @@ if (!Array.isArray(arr)) {
 
     if (deck.length === 0) throw new Error('생성된 문제가 없습니다.');
     return deck;
+  }
+
+
+  async function geminiText(apiKey, model, promptText) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: String(promptText) }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Gemini API error: ' + res.status);
+    const j = await res.json();
+    const text = j?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+    return text.trim();
   }
 
 
@@ -834,6 +929,25 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     if (correct) playCorrectSound(); else playWrongSound();
 
     if (correct) state.score[state.turn] += 1;
+    // record attempt
+    try {
+      const attempt = {
+        qid: String(q._qid || ''),
+        kind: String(q.kind || 'mcq'),
+        question: String(q.question || q.q || ''),
+        selected: state.selectedChoice,
+        answerIndex: q.answerIndex,
+        correct: !!correct,
+        explain: q.explain || '',
+        turn: state.turn,
+        scoreRed: state.score[0],
+        scoreBlue: state.score[1],
+      };
+      state.attempts.push(attempt);
+      // send to teacher (optional)
+      postCollector('attempt', attempt);
+    } catch {}
+
     setScores();
 
     closeModal(els.qModal);
@@ -963,12 +1077,17 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       if (state.remaining <= 0) {
         stopTimer();
         state.started = false;
-        alert(`시간 종료!\n빨강:${state.score[0]} / 파랑:${state.score[1]}`);
+        postCollector('end', { scoreRed: state.score[0], scoreBlue: state.score[1], turn: state.turn });
+        els.resultText && (els.resultText.textContent = `시간 종료!\n빨강:${state.score[0]} / 파랑:${state.score[1]}`);
+        openModal(els.resultModal);
       }
     }, 1000);
   }
 
   function startGame() {
+    loadCollectorCfg();
+    if (els.saveCollector && MODE !== 'teacher') saveCollectorCfg();
+    postCollector('join', { scoreRed:0, scoreBlue:0, turn:0 });
     state.started = true;
     state.turn = 0;
     state.pos = [0,0];
@@ -1097,6 +1216,87 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   els.startGame?.addEventListener('click', startGame);
   els.resetGame?.addEventListener('click', resetGame);
 
+
+  // collector save (student)
+  els.saveCollector?.addEventListener('click', () => {
+    saveCollectorCfg();
+    logLine('✅ 전송 설정 저장됨');
+  });
+
+  // teacher: session code helpers
+  els.newSessionCode?.addEventListener('click', () => {
+    if (!els.sessionCodeInput) return;
+    els.sessionCodeInput.value = randCode(6);
+    saveCollectorCfg();
+  });
+
+  els.copySessionInfo?.addEventListener('click', async () => {
+    saveCollectorCfg();
+    const url = (els.collectorUrlInput?.value || '').trim();
+    const code = (els.sessionCodeInput?.value || '').trim();
+    const msg = `보드게임 결과 자동수집 안내\n- 결과 전송 URL: ${url || '(없음)'}\n- 세션 코드: ${code}\n- 팀 이름을 입력하고 게임을 시작하세요.`;
+    try { await navigator.clipboard.writeText(msg); logLine('📋 학생 안내가 복사되었습니다.'); } catch { logLine('⚠️ 클립보드 복사 실패'); }
+  });
+
+  els.refreshResults?.addEventListener('click', async () => {
+    try{
+      const data = await fetchSessionSummary();
+      if (!data) return;
+      const lines = [];
+      if (!data.ok) lines.push('오류: ' + (data.error || 'unknown'));
+      else {
+        lines.push(`세션: ${data.session}`);
+        lines.push(`팀 수: ${data.teams?.length || 0}`);
+        (data.teams || []).forEach((t) => {
+          lines.push(`\n[${t.team}] 시도:${t.attempts} 정답:${t.correct} 오답:${t.wrong}`);
+          (t.wrongTop || []).slice(0,5).forEach((w,i)=> {
+            if (w.question) lines.push(`  - 오답${i+1}(${w.count}회): ${w.question}`);
+          });
+        });
+      }
+      if (els.resultLog) els.resultLog.textContent = lines.join('\n');
+    }catch(e){
+      if (els.resultLog) els.resultLog.textContent = '결과를 불러오지 못했습니다. URL/배포 설정을 확인하세요.';
+    }
+  });
+
+
+  els.generateFeedback?.addEventListener('click', async () => {
+    if (MODE !== 'teacher') return;
+    try{
+      const data = await fetchSessionSummary();
+      if (!data || !data.ok) { alert('먼저 [결과 새로고침]으로 수집 여부를 확인하세요.'); return; }
+      const key = getSavedKey();
+      if (!key) { alert('설정에서 Gemini API 키를 저장하세요.'); return; }
+
+      // Build prompt from summary
+      const lines = [];
+      lines.push('당신은 초등 수업용 AI 튜터입니다.');
+      lines.push('아래는 2인 보드게임 활동 결과(세션 요약)입니다.');
+      lines.push('각 팀별로: (1) 헷갈린 개념 추정 (2) 쉬운 설명 (3) 3문항 추가 연습문제(정답 포함) (4) 격려 한마디 를 한국어로 작성하세요.');
+      lines.push('');
+      (data.teams || []).forEach((t) => {
+        lines.push(`[팀: ${t.team}] 시도:${t.attempts} 정답:${t.correct} 오답:${t.wrong}`);
+        (t.wrongTop || []).slice(0,10).forEach((w,i)=>{
+          if (w.question) lines.push(`- 오답문항${i+1}(${w.count}회): ${w.question}`);
+        });
+        lines.push('');
+      });
+
+      const prompt = lines.join('\n');
+
+      // Reuse gemini call helper
+      const cfg = getAiConfig();
+      const text = await geminiText(key, cfg.model || DEFAULTS.model, prompt);
+      if (els.resultLog) els.resultLog.textContent = String(text || '');
+      logLine('✅ AI 피드백 생성 완료(결과 영역에 표시)');
+    }catch(e){
+      alert('피드백 생성 실패: ' + String(e?.message || e));
+    }
+  });
+
+
+
   els.exportPack?.addEventListener('click', exportCurrentPack);
   els.importPack?.addEventListener('click', triggerImport);
   els.importPackInput?.addEventListener('change', (e) => {
@@ -1158,6 +1358,8 @@ if (MODE !== 'teacher') {
     if (els.apiKeyInput) els.apiKeyInput.value = getSavedKey();
     refreshSetupHint();
   }
+
+  loadCollectorCfg();
 
   // restore last pack
   const last = loadLastPack();
