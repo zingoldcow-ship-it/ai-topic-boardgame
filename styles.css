@@ -483,6 +483,15 @@ body{
   color:#7a4a00;
 }
 
+/* soft lavender (dice button) */
+.btn.softLavender{
+  background: var(--lavender);
+  border-color:#d6c9f0;
+  color:#3b2a70;
+}
+.btn.softLavender:hover{filter:brightness(.98);}
+
+
 .btn.softYellow{
   background:#fef9c3;
   border-color:#facc15;
@@ -833,3 +842,15 @@ body[data-mode="landing"] .landing-card .btn{
 
 .btn.softBlue:hover{filter:brightness(.97);}
 .btn.softPink:hover{filter:brightness(.97);}
+
+/* teacher layout align like student */
+.teacher-container, .teacher-main, .teacher-layout {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* dice button soft purple */
+.dice-btn, .dice-card {
+  background: #f1ecfb !important;
+  border-color: #d6c9f0 !important;
+}
