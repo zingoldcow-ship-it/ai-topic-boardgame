@@ -731,11 +731,6 @@ body[data-mode="landing"] .landingGuideCard .guideTitle{
   letter-spacing:-0.2px;
   margin-bottom:6px;
 }
-body[data-mode="landing"] .landingGuideCard .guideList{
-  
-  padding-top:12px;
-  margin-top:10px;
-}
 
 body[data-mode="landing"] .landingGuideCard .guideNote{
   font-size:12.5px;
@@ -1223,11 +1218,6 @@ body[data-mode="landing"] .landingExtraCard .extraCol{
 }
 .btn.softPink:hover{filter:brightness(.97);}
 /* Landing: single divider for usage list (avoid double lines) */
-body[data-mode="landing"] .landingGuideCard .guideList{
-  border-top:1px solid rgba(2,6,23,.08);
-  padding-top:12px;
-  margin-top:10px;
-}
 /* Settings: learner level card background (light purple) */
 .learnerCard{
   background:#f3efff !important;
@@ -1258,15 +1248,27 @@ body[data-mode="landing"] .usageCard .guideList{
 }
 
 /* Landing: keep divider under '추가 기능' title */
-body[data-mode="landing"] .landingExtraCard .extraGrid{
-  border-top:1px solid rgba(2,6,23,.08);
-  padding-top:12px;
-  margin-top:10px;
-}
 /* Landing: divider under '추가 기능' title (explicit element) */
 body[data-mode="landing"] .landingExtraCard .extraDivider{
   height:1px;
   background:rgba(2,6,23,.08);
   margin:10px 0 12px;
   width:100%;
+}
+
+/* Landing: single dividers (no duplicate borders) */
+body[data-mode="landing"] .guideDivider,
+body[data-mode="landing"] .extraDivider{
+  display:block;
+  height:1px;
+  background:rgba(2,6,23,.10);
+  margin:10px 0 12px;
+  width:100%;
+}
+
+body[data-mode="landing"] .landingGuideCard .guideList{
+  margin-top:0;
+}
+body[data-mode="landing"] .landingExtraCard .extraGrid{
+  margin-top:0;
 }
