@@ -1244,3 +1244,15 @@ body[data-mode="landing"] .landingGuideCard .guideList{
   border-color:#e5e0ff !important;
 }
 
+/* Landing: ensure only ONE divider line under '사용방법' */
+body[data-mode="landing"] .guideList{ border-top:none !important; }
+body[data-mode="landing"] .usageCard .guideList{
+  border-top:1px solid rgba(2,6,23,.08) !important;
+  padding-top:12px;
+  margin-top:10px;
+}
+/* Settings: learner level card background (ultra light lavender) */
+.settingCard.cardB.learnerCard{
+  background:#fbfaff !important;
+  border-color:#ece8ff !important;
+}
