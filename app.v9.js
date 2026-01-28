@@ -1175,6 +1175,7 @@ if (MODE !== 'teacher') {
     els.deleteKey?.addEventListener('click', onDeleteKey);
     els.getKeyBtn?.addEventListener('click', () => window.open('https://aistudio.google.com/app/apikey', '_blank', 'noopener'));
     els.saveAi?.addEventListener('click', onSaveAi);
+    els.closeSettings?.addEventListener('click', closeDrawer);
     els.testAi?.addEventListener('click', onTestAi);
 
     const cfg = getAiConfig();

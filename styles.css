@@ -1151,3 +1151,74 @@ body[data-mode="landing"] .extraCol{
 body[data-mode="landing"] .extraLabel{
   margin-bottom:10px; /* space between label and list */
 }
+
+/* Usage card divider */
+body[data-mode="landing"] .landingGuideCard:first-of-type .guideTitle{
+  position:relative;
+}
+body[data-mode="landing"] .landingGuideCard:first-of-type .guideTitle::after{
+  content:"";
+  display:block;
+  height:1px;
+  background:rgba(2,6,23,.08);
+  margin-top:10px;
+}
+
+/* Extra features card color */
+body[data-mode="landing"] .landingExtraCard{
+  background:#fffbe6;
+  border-color:#ffe8a3;
+}
+
+/* Settings action buttons */
+.settingActions{
+  display:flex;
+  gap:12px;
+  margin-top:18px;
+}
+.settingActions .closeSetting{
+  background:#ffe4ef;
+  border:1px solid #ffc2d8;
+  color:#9f1239;
+  padding:10px 18px;
+  border-radius:14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.settingActions .closeSetting:hover{
+  filter:brightness(.96);
+}
+
+
+/* Landing: divider under section titles */
+body[data-mode="landing"] .guideDivider{
+  height:1px;
+  background:rgba(2,6,23,.08);
+  margin:10px 0 12px;
+  width:100%;
+}
+
+/* Landing: extra card different background (light yellow) */
+body[data-mode="landing"] .landingExtraCard{
+  background:#fff7d6;
+  border-color:#ffe3a3;
+}
+body[data-mode="landing"] .landingExtraCard .extraCol{
+  background:#ffffffc7;
+}
+
+/* Teacher settings: save row buttons */
+.saveRow{
+  display:flex;
+  gap:10px;
+  justify-content:flex-start;
+  align-items:center;
+  margin-top:14px;
+}
+.btn.softPink{
+  background:#ffe4ef;
+  border-color:#ffc1d8;
+  color:#be123c;
+  font-weight:800;
+}
+.btn.softPink:hover{filter:brightness(.97);}
