@@ -1272,3 +1272,9 @@ body[data-mode="landing"] .landingGuideCard .guideList{
 body[data-mode="landing"] .landingExtraCard .extraGrid{
   margin-top:0;
 }
+/* Landing: usage card uses title border (single line) */
+body[data-mode="landing"] .usageCard .guideTitle{
+  border-bottom:1px solid rgba(2,6,23,.10);
+  padding-bottom:12px;
+  margin-bottom:12px;
+}
