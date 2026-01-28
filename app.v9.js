@@ -18,6 +18,7 @@
     gameSeconds: 420,
     cols: 10,
     rows: 6,
+    learnerLevel: 'elem_high',
   };
 
   // ---------- sound (WebAudio, no external files) ----------
@@ -304,6 +305,7 @@ function extractObjectsFromText(text) {
     const cfg = raw ? safeJsonParse(raw) : null;
     return {
       model: cfg?.model || DEFAULTS.model,
+      learnerLevel: cfg?.learnerLevel || DEFAULTS.learnerLevel,
       qMode: cfg?.qMode || DEFAULTS.qMode,
       showAnswer: (typeof cfg?.showAnswer === 'boolean') ? cfg.showAnswer : DEFAULTS.showAnswer,
       deckCount: Number.isFinite(cfg?.deckCount) ? cfg.deckCount : DEFAULTS.deckCount,
@@ -416,11 +418,11 @@ function extractObjectsFromText(text) {
           `</svg></span>`;
         continue;
       }
-      const icon = (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
-        : (cell.kind === 'action' && cell.value > 0) ? '➡️'
-        : (cell.kind === 'action' && cell.value < 0) ? '⬅️'
-        : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '❓'
-        : '📝';
+      const icon = (cell.kind === 'action' && cell.action === 'skip') ? '■'
+        : (cell.kind === 'action' && cell.value > 0) ? '▶'
+        : (cell.kind === 'action' && cell.value < 0) ? '◀'
+        : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '◆'
+        : '★';
 
       el.innerHTML = `<span class="tile-label"><span class="tile-emoji">${icon}</span><span class="tile-text">${badge}</span></span>`;
     }
@@ -552,7 +554,10 @@ function extractObjectsFromText(text) {
   async function geminiGenerateDeck({topic, count, model, apiKey, qMode}) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const prompt = [
-      '당신은 초등 5~6학년 수업용 4지선다 퀴즈 제작자입니다.',
+      (learnerLevel === 'elem_low') ? '당신은 초등 1~3학년 수업용 퀴즈 제작자입니다.'
+      : (learnerLevel === 'elem_high') ? '당신은 초등 4~6학년 수업용 퀴즈 제작자입니다.'
+      : (learnerLevel === 'middle') ? '당신은 중학생 수업용 퀴즈 제작자입니다.'
+      : '당신은 고등학생 수업용 퀴즈 제작자입니다.',
       '주어진 주제로 보드게임에서 학생 2명이 풀 수 있는 짧은 문제를 만듭니다.',
       '반드시 JSON 배열만 출력합니다(다른 텍스트 금지).',
       '스키마(4지선다): { "kind":"mcq", "question":"...", "choices":["...","...","...","..."], "answerIndex":0~3, "explain":"(1~2문장)" }',
@@ -563,7 +568,10 @@ function extractObjectsFromText(text) {
       `개수: ${count}`,
       `문항 구성: ${qMode === 'mcq_ox' ? '4지선다 중심 + 일부 OX 포함' : '4지선다만'}`,
       '언어: 한국어',
-      '난이도: 초등 5~6학년 수준',
+      ('난이도: ' + ((learnerLevel === 'elem_low') ? '초등 저학년(1~3학년)'
+        : (learnerLevel === 'elem_high') ? '초등 고학년(4~6학년)'
+        : (learnerLevel === 'middle') ? '중학생'
+        : '고등학생') + ' 수준'),
     ].join('\n');
 
 const body = {
@@ -654,7 +662,7 @@ if (!Array.isArray(arr)) {
 
 
   // Generate deck in batches to reliably reach requested count (avoids token truncation).
-  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode }) {
+  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel }) {
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
     // batch size to stay within token limits
@@ -1012,9 +1020,10 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     try {
       const aiCfg0 = getAiConfig() || {};
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
-      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode });
+      const learnerLevel = (getAiConfig()?.learnerLevel) || (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
+      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel });
       const aiCfg = getAiConfig() || {};
-      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes() }, deck };
+      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
@@ -1047,15 +1056,17 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   function onSaveAi() {
     const model = els.modelSel?.value || DEFAULTS.model;
     const qMode = els.qMode?.value || DEFAULTS.qMode;
+    const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
     const showAnswer = !!(els.showAnswer?.checked);
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
     const activityMinutes = clamp(Number(els.activityMinutes?.value || DEFAULTS.activityMinutes), 1, 180);
-    setAiConfig({ model, qMode, showAnswer, deckCount, activityMinutes });
+    setAiConfig({ model, learnerLevel, qMode, showAnswer, deckCount, activityMinutes });
 
     // reflect into current pack (so 학생용 파일에도 반영)
     if (state.pack) {
       if (!state.pack.settings) state.pack.settings = {};
       state.pack.settings.activityMinutes = activityMinutes;
+      state.pack.settings.learnerLevel = learnerLevel;
       saveLastPack(state.pack);
     }
 
@@ -1074,6 +1085,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     const model = els.modelSel?.value || DEFAULTS.model;
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
+    const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
       await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode });
       alert('연결 성공!');
     } catch (e) {
@@ -1150,6 +1162,11 @@ if (MODE !== 'teacher') {
 
     const cfg = getAiConfig();
     if (els.modelSel) els.modelSel.value = cfg.model;
+    // learner level radios
+    const ll = cfg.learnerLevel || DEFAULTS.learnerLevel;
+    document.querySelectorAll('input[name="learnerLevel"]').forEach((el) => {
+      el.checked = (el.value === ll);
+    });
     if (els.qMode) els.qMode.value = cfg.qMode || DEFAULTS.qMode;
     if (els.showAnswer) els.showAnswer.checked = !!cfg.showAnswer;
     if (els.deckCount) els.deckCount.value = String(cfg.deckCount);

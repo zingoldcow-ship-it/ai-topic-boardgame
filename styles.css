@@ -854,3 +854,40 @@ body[data-mode="landing"] .landing-card .btn{
   background: #f1ecfb !important;
   border-color: #d6c9f0 !important;
 }
+
+
+
+/* Landing guide: vertical steps + extra features */
+.guideBlock{width:100%;}
+.guideList{margin:6px 0 0 18px; padding:0; display:flex; flex-direction:column; gap:6px; font-weight:700;}
+.guideList li{line-height:1.45;}
+.guideNote{font-weight:600; color:var(--muted); margin-left:6px;}
+.extraGrid{margin-top:6px; display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%;}
+.extraLabel{font-weight:800; margin-bottom:6px;}
+.extraList{margin:0 0 0 18px; padding:0; display:flex; flex-direction:column; gap:6px; font-weight:700;}
+@media (max-width:720px){
+  .extraGrid{grid-template-columns:1fr;}
+}
+
+/* Bigger role cards on landing */
+.roleCard{
+  min-height:120px;
+  font-size:20px;
+  border-radius:18px;
+  padding:18px 16px;
+}
+
+/* Settings: learner level radios + spacing */
+.radioStack{display:flex; flex-direction:column; gap:10px; margin-top:10px;}
+.radioItem{display:flex; align-items:center; gap:10px; font-weight:700;}
+.radioItem input{transform: scale(1.1);}
+.saveRow{margin-top:18px; padding-top:6px;}
+
+/* Board cell: softer symbols */
+.tile-emoji{
+  width:18px;
+  text-align:center;
+  flex:0 0 auto;
+  font-size:18px;
+  opacity:.9;
+}
