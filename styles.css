@@ -721,6 +721,55 @@ body{
 .dice.rolling{animation:diceSpin 1.2s ease-in-out;}
 
 
+/* Landing: usage/help cards (match landing-card width) */
+body[data-mode="landing"] .landingGuideWrap{
+  max-width: 980px;
+  margin: 14px auto 0;
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:12px;
+}
+body[data-mode="landing"] .landingGuideCard{
+  background:#f6fbe8;
+  border:1px solid #d9f2b8;
+}
+body[data-mode="landing"] .landingGuideCard .guideTitle{
+  font-weight:800;
+  font-size:16px;
+  letter-spacing:-0.2px;
+  margin-bottom:6px;
+}
+body[data-mode="landing"] .landingGuideCard .guideList{
+  margin:0;
+  padding-left:18px;
+  line-height:1.6;
+  font-size:14px;
+}
+body[data-mode="landing"] .landingGuideCard .guideNote{
+  font-size:12.5px;
+  color:var(--muted);
+}
+body[data-mode="landing"] .landingGuideCard .extraGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+  align-items:start;
+}
+body[data-mode="landing"] .landingGuideCard .extraLabel{
+  font-weight:800;
+  font-size:14px;
+  margin:0 0 6px;
+}
+body[data-mode="landing"] .landingGuideCard .extraList{
+  margin:0;
+  padding-left:18px;
+  line-height:1.6;
+  font-size:14px;
+}
+@media (max-width: 720px){
+  body[data-mode="landing"] .landingGuideCard .extraGrid{grid-template-columns:1fr;}
+}
+
 /* Landing: center and enlarge role buttons */
 body[data-mode="landing"] .landing-card{
   max-width: 980px;
@@ -737,14 +786,14 @@ body[data-mode="landing"] .landingActions{
 }
 body[data-mode="landing"] .landingActions .roleCard{
   width:100%;
-  min-height:92px;
+  min-height:124px;
 }
 @media (max-width: 720px){
   body[data-mode="landing"] .landingActions{grid-template-columns:1fr;}
 }
 
 body[data-mode="landing"] .landing-card .btn{
-  padding: 24px 18px;
+  padding: 30px 18px;
   font-size: 20px;
   border-radius: 18px;
   min-width: 0;
@@ -891,3 +940,56 @@ body[data-mode="landing"] .landing-card .btn{
   font-size:18px;
   opacity:.9;
 }
+
+
+/* Settings: learner level radio alignment */
+.radioStack{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:10px;
+}
+.radioItem{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:13.5px;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.radioItem input[type="radio"]{
+  margin:0;
+  transform: translateY(0.5px);
+}
+.learnerCard .settingCardDesc{
+  font-size:12.5px;
+  line-height:1.35;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Board tiles: soft symbols (colored, minimal) */
+.tile-symbol{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  font-size:15px;
+  line-height:1;
+  border:1px solid rgba(15,23,42,.10);
+  box-shadow:0 1px 0 rgba(2,6,23,.04);
+}
+.sym-star{ background:#fff3c4; color:#b45309; }
+.sym-sparkle{ background:#efe7ff; color:#6d28d9; }
+.sym-heart{ background:#ffe4ef; color:#be123c; }
+.sym-flower{ background:#e8fff2; color:#047857; }
+.sym-diamond{ background:#e0f2fe; color:#0369a1; }
+.sym-stop{ background:#fee2e2; color:#b91c1c; }
+.sym-plus{ background:#dcfce7; color:#15803d; }
+.sym-minus{ background:#e0e7ff; color:#3730a3; }

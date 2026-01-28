@@ -416,28 +416,32 @@ function extractObjectsFromText(text) {
           `</svg></span>`;
         continue;
       }
-      const icon = (cell.kind === 'action' && cell.action === 'skip') ? '⏸️'
-        : (cell.kind === 'action' && cell.value > 0) ? '➡️'
-        : (cell.kind === 'action' && cell.value < 0) ? '⬅️'
-        : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '❓'
-        : '📝';
+            const iconClass = (() => {
+        // Action tiles
+        if (cell.kind === 'action' && cell.action === 'skip') return 'tile-symbol sym-stop';
+        if (cell.kind === 'action' && cell.value > 0) return 'tile-symbol sym-plus';
+        if (cell.kind === 'action' && cell.value < 0) return 'tile-symbol sym-minus';
 
-      el.innerHTML = `<span class="tile-label"><span class="tile-emoji">${icon}</span><span class="tile-text">${badge}</span></span>`;
-    }
-  }
+        // Quiz tiles
+        if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-diamond';
 
-  const grid = buildGrid();
-  const path = buildPerimeterPath();
-  const cells = baseLayout(path.length);
-  renderTiles(grid, path, cells);
+        // Default quiz / other: rotate a few friendly soft symbols by index to add variety
+        const pool = ['tile-symbol sym-star', 'tile-symbol sym-sparkle', 'tile-symbol sym-heart', 'tile-symbol sym-flower'];
+        return pool[i % pool.length];
+      })();
 
-  // ---------- state ----------
-  const state = {
-    started: false,
-    turn: 0,
-    pos: [0,0],
-    score: [0,0],
-    skip: [0,0],
+      const iconChar = (() => {
+        if (iconClass.includes('sym-stop')) return '■';
+        if (iconClass.includes('sym-plus')) return '▲';
+        if (iconClass.includes('sym-minus')) return '▼';
+        if (iconClass.includes('sym-diamond')) return '◆';
+        if (iconClass.includes('sym-sparkle')) return '✦';
+        if (iconClass.includes('sym-heart')) return '♥';
+        if (iconClass.includes('sym-flower')) return '❀';
+        return '★';
+      })();
+
+      el.innerHTML = `<span class="tile-label"><span class="${iconClass}" aria-hidden="true">${iconChar}</span><span class="tile-text">${badge}</span></span>`;skip: [0,0],
     remaining: DEFAULTS.gameSeconds,
     timerId: null,
 
