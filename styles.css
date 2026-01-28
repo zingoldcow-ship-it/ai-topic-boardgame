@@ -1294,3 +1294,36 @@ body[data-mode="landing"] .usageCard .guideTitle{
 body[data-mode="landing"] .usageCard *{
   border-top:none !important;
 }
+/* Landing: usage inner card (card-in-card) */
+body[data-mode="landing"] .usageCard .usageInnerCard{
+  background:rgba(255,255,255,.75);
+  border:1px solid rgba(2,6,23,.10);
+  border-radius:14px;
+  padding:14px 16px;
+  margin-top:12px;
+}
+body[data-mode="landing"] .usageCard .usageRow{
+  display:flex;
+  gap:10px;
+  align-items:baseline;
+  padding:8px 2px;
+}
+body[data-mode="landing"] .usageCard .usageRow + .usageRow{
+  border-top:1px dashed rgba(2,6,23,.10);
+}
+body[data-mode="landing"] .usageCard .usageKey{
+  min-width:96px;
+  font-weight:800;
+  color:#0f172a;
+}
+body[data-mode="landing"] .usageCard .usageDesc{
+  font-size:14px;
+  color:rgba(15,23,42,.72);
+  line-height:1.35;
+}
+/* Landing: usage title without divider line (avoids multi-line illusion) */
+body[data-mode="landing"] .usageCard .guideTitle{
+  border:none !important;
+  padding-bottom:0 !important;
+  margin-bottom:0 !important;
+}
