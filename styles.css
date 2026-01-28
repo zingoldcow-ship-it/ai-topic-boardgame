@@ -1233,3 +1233,13 @@ body[data-mode="landing"] .landingGuideCard .guideList{
   background:#f3efff !important;
   border-color:#d8d2ff !important;
 }
+/* FINAL FIX: learner level card clearly light purple */
+.learnerCard{
+  background:#ede9ff !important; /* clearly lavender */
+  border-color:#c7bfff !important;
+}
+/* Strong override: learner card must be lavender (not beige) */
+.settingCard.cardB.learnerCard{
+  background:#ede7ff !important;
+  border-color:#d8d2ff !important;
+}
