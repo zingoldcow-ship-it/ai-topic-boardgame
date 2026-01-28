@@ -1256,3 +1256,10 @@ body[data-mode="landing"] .usageCard .guideList{
   background:#fbfaff !important;
   border-color:#ece8ff !important;
 }
+
+/* Landing: keep divider under '추가 기능' title */
+body[data-mode="landing"] .landingExtraCard .extraGrid{
+  border-top:1px solid rgba(2,6,23,.08);
+  padding-top:12px;
+  margin-top:10px;
+}
