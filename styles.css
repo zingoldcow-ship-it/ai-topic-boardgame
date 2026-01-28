@@ -1263,3 +1263,10 @@ body[data-mode="landing"] .landingExtraCard .extraGrid{
   padding-top:12px;
   margin-top:10px;
 }
+/* Landing: divider under '추가 기능' title (explicit element) */
+body[data-mode="landing"] .landingExtraCard .extraDivider{
+  height:1px;
+  background:rgba(2,6,23,.08);
+  margin:10px 0 12px;
+  width:100%;
+}
