@@ -416,17 +416,12 @@ function extractObjectsFromText(text) {
           `</svg></span>`;
         continue;
       }
-                  const iconClass = (() => {
-        // Action tiles
+                        const iconClass = (() => {
         if (cell.kind === 'action' && cell.action === 'skip') return 'tile-symbol sym-moon';
         if (cell.kind === 'action' && cell.value > 0) return 'tile-symbol sym-gift';
         if (cell.kind === 'action' && cell.value < 0) return 'tile-symbol sym-leaf';
-
-        // OX tiles
-        if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-diamond';
-
-        // Default quiz: rotate a few friendly symbols to add variety
-        const pool = ['tile-symbol sym-star', 'tile-symbol sym-cloud', 'tile-symbol sym-leaf', 'tile-symbol sym-gift'];
+        if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-cloud';
+        const pool = ['tile-symbol sym-star','tile-symbol sym-cloud','tile-symbol sym-leaf','tile-symbol sym-gift'];
         return pool[i % pool.length];
       })();
 
@@ -435,11 +430,11 @@ function extractObjectsFromText(text) {
         if (iconClass.includes('sym-gift')) return '🎁';
         if (iconClass.includes('sym-leaf')) return '🍀';
         if (iconClass.includes('sym-cloud')) return '☁️';
-        if (iconClass.includes('sym-diamond')) return '◆';
         return '⭐';
       })();
 
       el.innerHTML = `<span class="tile-label"><span class="${iconClass}" aria-hidden="true">${iconChar}</span><span class="tile-text">${badge}</span></span>`;
+
 skip: [0,0],
     remaining: DEFAULTS.gameSeconds,
     timerId: null,

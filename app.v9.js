@@ -418,14 +418,31 @@ function extractObjectsFromText(text) {
           `</svg></span>`;
         continue;
       }
-      const icon = (cell.kind === 'action' && cell.action === 'skip') ? '■'
-        : (cell.kind === 'action' && cell.value > 0) ? '▶'
-        : (cell.kind === 'action' && cell.value < 0) ? '◀'
-        : (cell.kind === 'quiz' && cell.qtype === 'ox') ? '◆'
-        : '★';
+            const iconClass = (() => {
+        // Action tiles
+        if (cell.kind === 'action' && cell.action === 'skip') return 'tile-symbol sym-moon';
+        if (cell.kind === 'action' && cell.value > 0) return 'tile-symbol sym-gift';
+        if (cell.kind === 'action' && cell.value < 0) return 'tile-symbol sym-leaf';
 
-      el.innerHTML = `<span class="tile-label"><span class="tile-emoji">${icon}</span><span class="tile-text">${badge}</span></span>`;
-    }
+        // OX tiles
+        if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-diamond';
+
+        // Default quiz: rotate a few friendly symbols to add variety
+        const pool = ['tile-symbol sym-star', 'tile-symbol sym-cloud', 'tile-symbol sym-leaf', 'tile-symbol sym-gift'];
+        return pool[i % pool.length];
+      })();
+
+      const iconChar = (() => {
+        if (iconClass.includes('sym-moon')) return '🌙';
+        if (iconClass.includes('sym-gift')) return '🎁';
+        if (iconClass.includes('sym-leaf')) return '🍀';
+        if (iconClass.includes('sym-cloud')) return '☁️';
+        if (iconClass.includes('sym-diamond')) return '◆';
+        return '⭐';
+      })();
+
+      el.innerHTML = `<span class="tile-label"><span class="${iconClass}" aria-hidden="true">${iconChar}</span><span class="tile-text">${badge}</span></span>`;
+}
   }
 
   const grid = buildGrid();

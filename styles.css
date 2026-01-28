@@ -763,13 +763,7 @@ body[data-mode="landing"] .landingGuideCard .extraList{
 }
 
 /* Landing: 3-step stacked cards (usage -> extra -> role) */
-body[data-mode="landing"] .landingStack{
-  max-width: 980px;
-  margin: 14px auto 0;
-  display:grid;
-  grid-template-columns: 1fr;
-  gap:12px;
-}
+body[data-mode="landing"] .landingStack{max-width:980px;margin:14px auto 0;display:grid;grid-template-columns:1fr;gap:14px;}
 body[data-mode="landing"] .landingGuideCard{
   background:#f6fbe8;
   border:1px solid #d9f2b8;
@@ -1101,3 +1095,59 @@ body[data-mode="landing"] .landing-card .btn{
 .tile-label .sym-gift{ background:#ffeaf3; color:#fb7185 !important; }
 .tile-label .sym-moon{ background:#f2ecff; color:#8b5cf6 !important; }
 .tile-label .sym-diamond{ background:#e0f2fe; color:#38bdf8 !important; }
+
+/* Landing: guide spacing & title emphasis */
+body[data-mode="landing"] .landingGuideCard .guideTitle{
+  font-size:18px;
+  margin-bottom:12px;
+}
+body[data-mode="landing"] .landingGuideCard{
+  padding-top:18px;
+}
+
+body[data-mode="landing"] .guideList li{
+  margin-bottom:6px;
+}
+body[data-mode="landing"] .extraLabel{
+  margin-top:4px;
+}
+
+/* Extra feature inner cards */
+body[data-mode="landing"] .extraGrid{
+  gap:16px;
+}
+body[data-mode="landing"] .extraCol{
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:12px 14px;
+}
+
+
+/* Landing: align card widths perfectly */
+body[data-mode="landing"] .landingStack > .card{
+  width:100%;
+}
+body[data-mode="landing"] .landingGuideCard{
+  padding:18px 18px;
+}
+body[data-mode="landing"] .landingGuideCard .guideTitle{
+  font-size:18px;
+  margin-bottom:12px; /* space between title and first line */
+}
+body[data-mode="landing"] .landingExtraCard .guideTitle{
+  margin-bottom:12px;
+}
+body[data-mode="landing"] .extraGrid{
+  border-top:1px solid rgba(2,6,23,.08);
+  padding-top:12px;
+}
+body[data-mode="landing"] .extraCol{
+  background:#ffffff9e;
+  border:1px solid rgba(2,6,23,.06);
+  border-radius:14px;
+  padding:12px 12px;
+}
+body[data-mode="landing"] .extraLabel{
+  margin-bottom:10px; /* space between label and list */
+}
