@@ -1222,3 +1222,14 @@ body[data-mode="landing"] .landingExtraCard .extraCol{
   font-weight:800;
 }
 .btn.softPink:hover{filter:brightness(.97);}
+/* Landing: single divider for usage list (avoid double lines) */
+body[data-mode="landing"] .landingGuideCard .guideList{
+  border-top:1px solid rgba(2,6,23,.08);
+  padding-top:12px;
+  margin-top:10px;
+}
+/* Settings: learner level card background (light purple) */
+.learnerCard{
+  background:#f3efff !important;
+  border-color:#d8d2ff !important;
+}
