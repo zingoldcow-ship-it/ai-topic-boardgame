@@ -1236,11 +1236,7 @@ body[data-mode="landing"] .landingExtraCard .extraCol{
 
 /* Landing: ensure only ONE divider line under '사용방법' */
 body[data-mode="landing"] .guideList{ border-top:none !important; }
-body[data-mode="landing"] .usageCard .guideList{
-  border-top:1px solid rgba(2,6,23,.08) !important;
-  padding-top:12px;
-  margin-top:10px;
-}
+body[data-mode="landing"] 
 /* Settings: learner level card background (ultra light lavender) */
 .settingCard.cardB.learnerCard{
   background:#fbfaff !important;
@@ -1273,11 +1269,7 @@ body[data-mode="landing"] .landingExtraCard .extraGrid{
   margin-top:0;
 }
 /* Landing: usage card uses title border (single line) */
-body[data-mode="landing"] .usageCard .guideTitle{
-  border-bottom:1px solid rgba(2,6,23,.10);
-  padding-bottom:12px;
-  margin-bottom:12px;
-}
+body[data-mode="landing"] 
 /* Align page title with card layout */
 .pageContainer{
   max-width: 1200px;
@@ -1292,4 +1284,13 @@ body[data-mode="landing"] .container{
   max-width:980px;
   margin:0 auto;
   padding:16px;
+}
+/* Landing – SINGLE divider rule (usage card only) */
+body[data-mode="landing"] .usageCard .guideTitle{
+  border-bottom:1px solid rgba(2,6,23,.12);
+  padding-bottom:14px;
+  margin-bottom:14px;
+}
+body[data-mode="landing"] .usageCard *{
+  border-top:none !important;
 }
