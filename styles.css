@@ -1327,3 +1327,10 @@ body[data-mode="landing"] .usageCard .guideTitle{
   padding-bottom:0 !important;
   margin-bottom:0 !important;
 }
+/* Tighten spacing between number/title and description */
+body[data-mode="landing"] .usageCard .usageRow{
+  gap:6px;
+}
+body[data-mode="landing"] .usageCard .usageDesc{
+  margin-left:2px;
+}
