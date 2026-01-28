@@ -15,29 +15,47 @@
       </div>
     </div>
 
-        <div class="landingGuideWrap">
+            <div class="landingStack">
       <div class="card landingGuideCard">
-        <div class="guideBlock">
-                <div class="guideTitle">사용방법</div>
+        <div class="guideTitle">사용방법</div>
+        <ol class="guideList">
+          <li><b>옵션 세팅</b> <span class="guideNote">(AI 모델, 문항 수, 활동 시간을 설정해요)</span></li>
+          <li><b>주제 입력</b> <span class="guideNote">(수업에 사용할 학습 주제를 입력해요)</span></li>
+          <li><b>문제 생성</b> <span class="guideNote">(AI가 주제에 맞는 문제를 자동으로 만들어요)</span></li>
+        </ol>
       </div>
 
       <div class="card landingGuideCard landingExtraCard">
-        <div class="guideBlock guideExtra">
-                <div class="guideTitle">추가 기능</div>
+        <div class="guideTitle">추가 기능</div>
+        <div class="extraGrid">
+          <div class="extraCol">
+            <div class="extraLabel">교사용</div>
+            <ul class="extraList">
+              <li>생성한 문제 파일 저장</li>
+              <li>저장된 문제 파일 불러오기</li>
+            </ul>
+          </div>
+          <div class="extraCol">
+            <div class="extraLabel">학생용</div>
+            <ul class="extraList">
+              <li>저장된 문제 파일 불러오기</li>
+            </ul>
+          </div>
+        </div>
       </div>
-    </div>
 
-<div class="main" style="grid-template-columns:1fr;">
       <div class="card landing-card">
         <h2>어느 화면으로 들어갈까요?</h2>
         <div class="landingActions">
           <a class="btn teacher roleCard" href="./teacher.html">교사용 (문제 만들기)</a>
           <a class="btn student roleCard" href="./student.html">학생용 (게임 플레이)</a>
         </div>
-        <p style="margin:12px 0 0; color:var(--muted); font-size:13px; line-height:1.5;">
-          학생용은 API 키가 필요 없습니다. 교사가 만든 문제가 자동 적용되어 바로 게임을 시작할 수 있고, 필요하면 “문제 파일(.json)”을 불러올 수도 있습니다.</p>
+        <p class="landingHelp">
+          학생용은 API 키가 필요 없습니다. 교사가 만든 문제가 자동 적용되어 바로 게임을 시작할 수 있고, 필요하면 “문제 파일(.json)”을 불러올 수도 있습니다.
+        </p>
       </div>
     </div>
+
   </div>
   <script src="./gate.js"></script>
   <script>TeacherGate.bindTeacherButton({buttonSelector:"#btnTeacher", teacherUrl:"./teacher.html"});</script>

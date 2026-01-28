@@ -721,14 +721,6 @@ body{
 .dice.rolling{animation:diceSpin 1.2s ease-in-out;}
 
 
-/* Landing: usage/help cards (match landing-card width) */
-body[data-mode="landing"] .landingGuideWrap{
-  max-width: 980px;
-  margin: 14px auto 0;
-  display:grid;
-  grid-template-columns: 1fr;
-  gap:12px;
-}
 body[data-mode="landing"] .landingGuideCard{
   background:#f6fbe8;
   border:1px solid #d9f2b8;
@@ -768,6 +760,67 @@ body[data-mode="landing"] .landingGuideCard .extraList{
 }
 @media (max-width: 720px){
   body[data-mode="landing"] .landingGuideCard .extraGrid{grid-template-columns:1fr;}
+}
+
+/* Landing: 3-step stacked cards (usage -> extra -> role) */
+body[data-mode="landing"] .landingStack{
+  max-width: 980px;
+  margin: 14px auto 0;
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:12px;
+}
+body[data-mode="landing"] .landingGuideCard{
+  background:#f6fbe8;
+  border:1px solid #d9f2b8;
+}
+body[data-mode="landing"] .landingGuideCard .guideTitle{
+  font-weight:800;
+  font-size:16px;
+  letter-spacing:-0.2px;
+  margin-bottom:6px;
+}
+body[data-mode="landing"] .guideList{
+  margin:0;
+  padding-left:18px;
+  line-height:1.6;
+  font-size:14px;
+}
+body[data-mode="landing"] .guideNote{
+  font-size:12.5px;
+  color:var(--muted);
+  white-space:nowrap;
+}
+body[data-mode="landing"] .extraGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+  align-items:start;
+}
+body[data-mode="landing"] .extraLabel{
+  font-weight:800;
+  font-size:14px;
+  margin:0 0 6px;
+}
+body[data-mode="landing"] .extraList{
+  margin:0;
+  padding-left:18px;
+  line-height:1.6;
+  font-size:14px;
+}
+body[data-mode="landing"] .landing-card{
+  max-width:none;
+  margin:0;
+}
+body[data-mode="landing"] .landingHelp{
+  margin:12px 0 0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.5;
+}
+@media (max-width: 720px){
+  body[data-mode="landing"] .extraGrid{grid-template-columns:1fr;}
+  body[data-mode="landing"] .guideNote{white-space:normal;}
 }
 
 /* Landing: center and enlarge role buttons */
@@ -993,3 +1046,58 @@ body[data-mode="landing"] .landing-card .btn{
 .sym-stop{ background:#fee2e2; color:#b91c1c; }
 .sym-plus{ background:#dcfce7; color:#15803d; }
 .sym-minus{ background:#e0e7ff; color:#3730a3; }
+
+
+/* Settings: learner level card + radio alignment */
+.learnerCard{
+  background:#fff0f6;
+  border-color:#ffd1e1;
+}
+.learnerCard .settingCardDesc{
+  font-size:12.5px;
+  line-height:1.35;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.radioStack{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:10px;
+  align-items:flex-start;
+}
+.radioItem{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:13px;
+  color:var(--text);
+  white-space:nowrap;
+}
+.radioItem span{
+  font-size:13px;
+  font-weight:600;
+}
+
+
+/* Board tiles: cute soft symbols (ensure colored) */
+.tile-label .tile-symbol{
+  width:28px;
+  height:28px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  font-size:16px;
+  line-height:1;
+  border:1px solid rgba(15,23,42,.10);
+  box-shadow:0 1px 0 rgba(2,6,23,.04);
+}
+.tile-label .sym-cloud{ background:#e9f4ff; color:#0ea5e9 !important; }
+.tile-label .sym-star{ background:#fff6cf; color:#f59e0b !important; }
+.tile-label .sym-leaf{ background:#e9fff2; color:#22c55e !important; }
+.tile-label .sym-gift{ background:#ffeaf3; color:#fb7185 !important; }
+.tile-label .sym-moon{ background:#f2ecff; color:#8b5cf6 !important; }
+.tile-label .sym-diamond{ background:#e0f2fe; color:#38bdf8 !important; }

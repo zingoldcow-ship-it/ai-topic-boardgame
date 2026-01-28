@@ -416,32 +416,31 @@ function extractObjectsFromText(text) {
           `</svg></span>`;
         continue;
       }
-            const iconClass = (() => {
+                  const iconClass = (() => {
         // Action tiles
-        if (cell.kind === 'action' && cell.action === 'skip') return 'tile-symbol sym-stop';
-        if (cell.kind === 'action' && cell.value > 0) return 'tile-symbol sym-plus';
-        if (cell.kind === 'action' && cell.value < 0) return 'tile-symbol sym-minus';
+        if (cell.kind === 'action' && cell.action === 'skip') return 'tile-symbol sym-moon';
+        if (cell.kind === 'action' && cell.value > 0) return 'tile-symbol sym-gift';
+        if (cell.kind === 'action' && cell.value < 0) return 'tile-symbol sym-leaf';
 
-        // Quiz tiles
+        // OX tiles
         if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-diamond';
 
-        // Default quiz / other: rotate a few friendly soft symbols by index to add variety
-        const pool = ['tile-symbol sym-star', 'tile-symbol sym-sparkle', 'tile-symbol sym-heart', 'tile-symbol sym-flower'];
+        // Default quiz: rotate a few friendly symbols to add variety
+        const pool = ['tile-symbol sym-star', 'tile-symbol sym-cloud', 'tile-symbol sym-leaf', 'tile-symbol sym-gift'];
         return pool[i % pool.length];
       })();
 
       const iconChar = (() => {
-        if (iconClass.includes('sym-stop')) return '■';
-        if (iconClass.includes('sym-plus')) return '▲';
-        if (iconClass.includes('sym-minus')) return '▼';
+        if (iconClass.includes('sym-moon')) return '🌙';
+        if (iconClass.includes('sym-gift')) return '🎁';
+        if (iconClass.includes('sym-leaf')) return '🍀';
+        if (iconClass.includes('sym-cloud')) return '☁️';
         if (iconClass.includes('sym-diamond')) return '◆';
-        if (iconClass.includes('sym-sparkle')) return '✦';
-        if (iconClass.includes('sym-heart')) return '♥';
-        if (iconClass.includes('sym-flower')) return '❀';
-        return '★';
+        return '⭐';
       })();
 
-      el.innerHTML = `<span class="tile-label"><span class="${iconClass}" aria-hidden="true">${iconChar}</span><span class="tile-text">${badge}</span></span>`;skip: [0,0],
+      el.innerHTML = `<span class="tile-label"><span class="${iconClass}" aria-hidden="true">${iconChar}</span><span class="tile-text">${badge}</span></span>`;
+skip: [0,0],
     remaining: DEFAULTS.gameSeconds,
     timerId: null,
 
