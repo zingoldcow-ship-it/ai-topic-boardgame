@@ -1278,3 +1278,18 @@ body[data-mode="landing"] .usageCard .guideTitle{
   padding-bottom:12px;
   margin-bottom:12px;
 }
+/* Align page title with card layout */
+.pageContainer{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+.pageContainer .appTitle{
+  margin-left: 0;
+}
+/* Landing: align page title with cards */
+body[data-mode="landing"] .container{
+  max-width:980px;
+  margin:0 auto;
+  padding:16px;
+}
