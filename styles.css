@@ -1044,8 +1044,8 @@ body[data-mode="landing"] .landing-card .btn{
 
 /* Settings: learner level card + radio alignment */
 .learnerCard{
-  background:#fff0f6;
-  border-color:#ffd1e1;
+  background:#f3efff;
+  border-color:#d8d2ff;
 }
 .learnerCard .settingCardDesc{
   font-size:12.5px;
