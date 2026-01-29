@@ -20,62 +20,6 @@
     rows: 6,
     learnerLevel: 'elem_high',
   };
-  // --- Networking helpers ---------------------------------------------------
-  // Gemini API can return 429 when rate-limited or quota-limited.
-  // We retry a few times with exponential backoff to make UX smoother.
-  async function fetchWithRetry(url, options, { retries = 2, baseDelayMs = 700 } = {}) {
-    let lastErr = null;
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const res = await withTimeout(fetchWithRetry(url, options));
-        if (res.status !== 429) return res;
-
-        // 429: Too Many Requests / Quota / Rate limit
-        const retryAfter = Number(res.headers.get('retry-after'));
-        const delay = Number.isFinite(retryAfter) && retryAfter > 0
-          ? Math.min(retryAfter * 1000, 5000)
-          : Math.round(baseDelayMs * Math.pow(2, attempt) + Math.random() * 250);
-
-        // Consume body (best effort) to avoid leaking streams
-        try { await res.text(); } catch (_) {}
-
-        if (attempt >= retries) return res;
-        await new Promise(r => setTimeout(r, delay));
-      } catch (e) {
-        lastErr = e;
-        if (attempt >= retries) throw lastErr;
-        const delay = Math.round(baseDelayMs * Math.pow(2, attempt) + Math.random() * 250);
-        await new Promise(r => setTimeout(r, delay));
-      }
-    }
-    throw lastErr || new Error('Network error');
-  }
-
-  function formatGeminiError(status, bodyText) {
-    // Keep it short for alert dialogs
-    const head = `Gemini 요청이 차단되었습니다. (HTTP ${status})`;
-    if (status === 429) {
-      return `${head}\n\n원인: 사용 한도(Quota) 또는 속도 제한(Rate limit)에 걸렸습니다.\n해결: 1~2분 뒤 다시 시도하거나, 문제 수를 줄여 테스트하세요.\nAI Studio/Google Cloud에서 Quota 상태도 확인해 주세요.`;
-    }
-    return `${head}\n\n${(bodyText || '').slice(0, 400)}`;
-  }
-  
-  async function withTimeout(promise, ms=30000){
-    let timer;
-    const timeout = new Promise((_, reject)=>{
-      timer = setTimeout(()=>reject(new Error('요청 시간이 초과되었습니다. (30초)')), ms);
-    });
-    try {
-      return await Promise.race([promise, timeout]);
-    } finally {
-      clearTimeout(slowTipTimer);
-
-      clearTimeout(timer);
-    }
-  }
-
-  // --------------------------------------------------------------------------
-
 
   // ---------- sound (WebAudio, no external files) ----------
   let audioCtx = null;
@@ -518,7 +462,6 @@ function extractObjectsFromText(text) {
 
   // ---------- state ----------
   const state = {
-    aiBusy: false,
     started: false,
     turn: 0,
     pos: [0,0],
@@ -664,7 +607,7 @@ const body = {
   generationConfig: { temperature: 0.6, maxOutputTokens: 8192, responseMimeType: 'application/json' },
 };
 
-const res = await withTimeout(fetchWithRetry(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
 const raw = await res.text();
 
 if (!res.ok) {
@@ -762,8 +705,7 @@ if (!Array.isArray(arr)) {
       const remain = target - out.length;
       const n = Math.min(batchSize, remain);
 
-      const deckPart = await geminiGenerateDeck
-        alert('AI 연결 성공! 설정값이 정상적으로 인식되었습니다.');({
+      const deckPart = await geminiGenerateDeck({
         topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만, 남은 개수: ${n}개)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
         count: n,
         model,
@@ -787,8 +729,7 @@ if (!Array.isArray(arr)) {
     // Final strict fill if still short
     if (out.length < target) {
       const remain = target - out.length;
-      const deckPart = await geminiGenerateDeck
-        alert('AI 연결 성공! 설정값이 정상적으로 인식되었습니다.');({
+      const deckPart = await geminiGenerateDeck({
         topic: `${topic}\n(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만. explain 1문장)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
         count: remain,
         model,
@@ -1104,16 +1045,11 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     els.applyTopic.disabled = true;
     els.applyTopic.textContent = '생성 중...';
 
-    const slowTipTimer = setTimeout(() => {
-      try { logLine('⏳ 생성이 지연되고 있습니다. 429(속도/할당량 제한)일 수 있어요. 잠시 후 다시 시도하거나 문제 수를 줄여 테스트해 보세요.'); } catch(_) {}
-    }, 35000);
-
     try {
       const aiCfg0 = getAiConfig() || {};
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
       const learnerLevel = (getAiConfig()?.learnerLevel) || (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
-      const deck = await geminiGenerateDeck
-        alert('AI 연결 성공! 설정값이 정상적으로 인식되었습니다.');Batched({ topic, count, model, apiKey, qMode, learnerLevel });
+      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel });
       const aiCfg = getAiConfig() || {};
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
       applyPack(pack, {resetDeck:true});
@@ -1122,8 +1058,6 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     } catch (e) {
       alert(String(e?.message || e));
     } finally {
-      clearTimeout(slowTipTimer);
-
       els.applyTopic.disabled = false;
       els.applyTopic.textContent = '문제 생성';
     }
@@ -1177,17 +1111,12 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     const apiKey = getSavedKey().trim();
     if (!apiKey) { alert('API 키가 없습니다.'); return; }
     const model = els.modelSel?.value || DEFAULTS.model;
-    const btn = els.testAi;
-    if (btn) { btn.disabled = true; btn.dataset._oldText = btn.textContent; btn.textContent = '테스트 중...'; }
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
-      await geminiGenerateDeck
-        alert('AI 연결 성공! 설정값이 정상적으로 인식되었습니다.');({ topic: '연결 테스트', count: 2, model, apiKey, qMode, learnerLevel });
+      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode, learnerLevel });
       alert(`연결 성공!\n\n[현재 설정]\n모델: ${model}\n문항유형: ${qMode}\n학습자수준: ${learnerLevel}`);
     } catch (e) {
-      // show a clear message
-
       alert(String(e?.message || e));
     }
   }
