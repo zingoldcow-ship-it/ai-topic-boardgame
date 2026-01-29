@@ -18,6 +18,7 @@
     gameSeconds: 420,
     cols: 10,
     rows: 6,
+    learnerLevel: 'elem_high',
   };
 
   // ---------- sound (WebAudio, no external files) ----------
@@ -302,10 +303,19 @@ function extractObjectsFromText(text) {
   function getAiConfig() {
     const raw = localStorage.getItem(STORAGE.aiConfig);
     const cfg = raw ? safeJsonParse(raw) : null;
+    // migrate legacy values → keep UX consistent
+    // - old default deckCount was 30, new recommended default is 45
+    // - persist migration so UI doesn't keep reverting
+    if (cfg && Number(cfg.deckCount) === 30) {
+      cfg.deckCount = 45;
+      try { localStorage.setItem(STORAGE.aiConfig, JSON.stringify(cfg)); } catch (_) {}
+    }
+
     // migrate legacy default (30) → new default (45)
     if (cfg && Number(cfg.deckCount) === 30) cfg.deckCount = 45;
     return {
       model: cfg?.model || DEFAULTS.model,
+      learnerLevel: cfg?.learnerLevel || DEFAULTS.learnerLevel,
       qMode: cfg?.qMode || DEFAULTS.qMode,
       showAnswer: (typeof cfg?.showAnswer === 'boolean') ? cfg.showAnswer : DEFAULTS.showAnswer,
       deckCount: Number.isFinite(cfg?.deckCount) ? cfg.deckCount : DEFAULTS.deckCount,
@@ -418,12 +428,17 @@ function extractObjectsFromText(text) {
           `</svg></span>`;
         continue;
       }
-                        const iconClass = (() => {
+            const iconClass = (() => {
+        // Action tiles
         if (cell.kind === 'action' && cell.action === 'skip') return 'tile-symbol sym-moon';
         if (cell.kind === 'action' && cell.value > 0) return 'tile-symbol sym-gift';
         if (cell.kind === 'action' && cell.value < 0) return 'tile-symbol sym-leaf';
-        if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-cloud';
-        const pool = ['tile-symbol sym-star','tile-symbol sym-cloud','tile-symbol sym-leaf','tile-symbol sym-gift'];
+
+        // OX tiles
+        if (cell.kind === 'quiz' && cell.qtype === 'ox') return 'tile-symbol sym-diamond';
+
+        // Default quiz: rotate a few friendly symbols to add variety
+        const pool = ['tile-symbol sym-star', 'tile-symbol sym-cloud', 'tile-symbol sym-leaf', 'tile-symbol sym-gift'];
         return pool[i % pool.length];
       })();
 
@@ -432,12 +447,26 @@ function extractObjectsFromText(text) {
         if (iconClass.includes('sym-gift')) return '🎁';
         if (iconClass.includes('sym-leaf')) return '🍀';
         if (iconClass.includes('sym-cloud')) return '☁️';
+        if (iconClass.includes('sym-diamond')) return '◆';
         return '⭐';
       })();
 
       el.innerHTML = `<span class="tile-label"><span class="${iconClass}" aria-hidden="true">${iconChar}</span><span class="tile-text">${badge}</span></span>`;
+}
+  }
 
-skip: [0,0],
+  const grid = buildGrid();
+  const path = buildPerimeterPath();
+  const cells = baseLayout(path.length);
+  renderTiles(grid, path, cells);
+
+  // ---------- state ----------
+  const state = {
+    started: false,
+    turn: 0,
+    pos: [0,0],
+    score: [0,0],
+    skip: [0,0],
     remaining: DEFAULTS.gameSeconds,
     timerId: null,
 
@@ -467,12 +496,19 @@ skip: [0,0],
       const idx = state.pos[p];
       const [r,c] = path[idx];
       const el = grid[`${r}-${c}`];
+
+      // Use robot images (CSS background-image)
       const t = document.createElement('span');
       t.className = `token ${p===0?'red':'blue'}`;
+      t.setAttribute('aria-hidden','true');
       el.appendChild(t);
     }
   }
   setScores(); setTimer(); drawTokens();
+  // init board center topic text
+  const _ct = document.getElementById('centerTopicText');
+  if (_ct && MODE==='teacher') _ct.textContent = (els.topicInput?.value || '').trim() || '주제를 입력하세요';
+  if (_ct && MODE!=='teacher') _ct.textContent = (state.pack?.topic || '주제를 입력하세요');
 
   // ---------- pack import/export ----------
   function validatePack(pack) {
@@ -515,6 +551,10 @@ skip: [0,0],
     const topicLine = document.querySelector('[data-pack-topic]');
     if (topicLine) topicLine.textContent = `문제: ${pack.topic} (총 ${pack.deck.length}문항)`;
 
+    const centerText = document.getElementById('centerTopicText');
+    if (centerText) centerText.textContent = pack.topic || '';
+
+
     if (!state.started) {
       state.remaining = getConfiguredGameSeconds();
       setTimer();
@@ -525,7 +565,7 @@ skip: [0,0],
 
   function exportCurrentPack() {
     if (!state.pack) {
-      alert('저장할 문제 파일이 없습니다. (교사: 먼저 문제 적용 / 학생: 파일 불러오기)');
+      alert('저장할 문제 파일이 없습니다. (교사: 먼저 문제 생성 / 학생: 파일 불러오기)');
       return;
     }
     // ensure exported pack includes timer setting
@@ -538,10 +578,14 @@ skip: [0,0],
   }
 
   // ---------- gemini (teacher) ----------
-  async function geminiGenerateDeck({topic, count, model, apiKey, qMode}) {
+  async function geminiGenerateDeck({topic, count, model, apiKey, qMode, learnerLevel}) {
+    learnerLevel = learnerLevel || DEFAULTS.learnerLevel;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const prompt = [
-      '당신은 초등 5~6학년 수업용 4지선다 퀴즈 제작자입니다.',
+      (learnerLevel === 'elem_low') ? '당신은 초등 1~3학년 수업용 퀴즈 제작자입니다.'
+      : (learnerLevel === 'elem_high') ? '당신은 초등 4~6학년 수업용 퀴즈 제작자입니다.'
+      : (learnerLevel === 'middle') ? '당신은 중학생 수업용 퀴즈 제작자입니다.'
+      : '당신은 고등학생 수업용 퀴즈 제작자입니다.',
       '주어진 주제로 보드게임에서 학생 2명이 풀 수 있는 짧은 문제를 만듭니다.',
       '반드시 JSON 배열만 출력합니다(다른 텍스트 금지).',
       '스키마(4지선다): { "kind":"mcq", "question":"...", "choices":["...","...","...","..."], "answerIndex":0~3, "explain":"(1~2문장)" }',
@@ -552,7 +596,10 @@ skip: [0,0],
       `개수: ${count}`,
       `문항 구성: ${qMode === 'mcq_ox' ? '4지선다 중심 + 일부 OX 포함' : '4지선다만'}`,
       '언어: 한국어',
-      '난이도: 초등 5~6학년 수준',
+      ('난이도: ' + ((learnerLevel === 'elem_low') ? '초등 저학년(1~3학년)'
+        : (learnerLevel === 'elem_high') ? '초등 고학년(4~6학년)'
+        : (learnerLevel === 'middle') ? '중학생'
+        : '고등학생') + ' 수준'),
     ].join('\n');
 
 const body = {
@@ -643,7 +690,7 @@ if (!Array.isArray(arr)) {
 
 
   // Generate deck in batches to reliably reach requested count (avoids token truncation).
-  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode }) {
+  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel }) {
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
     // batch size to stay within token limits
@@ -775,7 +822,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   
   function askQuestion(kindWanted='mcq') {
     const q = nextQuestion(kindWanted);
-    if (!q) { alert('문제 파일이 없습니다. (교사: 문제 적용 / 학생: 문제 파일 불러오기)'); return; }
+    if (!q) { alert('문제 파일이 없습니다. (교사: 문제 생성 / 학생: 문제 파일 불러오기)'); return; }
     if (q._depleted) { alert('문제 덱이 모두 소진되었습니다.'); return; }
 
     state.currentQuestion = q;
@@ -1001,9 +1048,10 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     try {
       const aiCfg0 = getAiConfig() || {};
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
-      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode });
+      const learnerLevel = (getAiConfig()?.learnerLevel) || (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
+      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel });
       const aiCfg = getAiConfig() || {};
-      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes() }, deck };
+      const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
@@ -1011,7 +1059,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       alert(String(e?.message || e));
     } finally {
       els.applyTopic.disabled = false;
-      els.applyTopic.textContent = '문제 적용';
+      els.applyTopic.textContent = '문제 생성';
     }
   }
 
@@ -1036,15 +1084,17 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   function onSaveAi() {
     const model = els.modelSel?.value || DEFAULTS.model;
     const qMode = els.qMode?.value || DEFAULTS.qMode;
+    const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
     const showAnswer = !!(els.showAnswer?.checked);
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
     const activityMinutes = clamp(Number(els.activityMinutes?.value || DEFAULTS.activityMinutes), 1, 180);
-    setAiConfig({ model, qMode, showAnswer, deckCount, activityMinutes });
+    setAiConfig({ model, learnerLevel, qMode, showAnswer, deckCount, activityMinutes });
 
     // reflect into current pack (so 학생용 파일에도 반영)
     if (state.pack) {
       if (!state.pack.settings) state.pack.settings = {};
       state.pack.settings.activityMinutes = activityMinutes;
+      state.pack.settings.learnerLevel = learnerLevel;
       saveLastPack(state.pack);
     }
 
@@ -1053,6 +1103,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       state.remaining = getConfiguredGameSeconds();
       setTimer();
     }
+    closeDrawer();
     alert('설정을 저장했습니다.');
   }
 
@@ -1062,8 +1113,9 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     const model = els.modelSel?.value || DEFAULTS.model;
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
-      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode });
-      alert('연결 성공!');
+    const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
+      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode, learnerLevel });
+      alert(`연결 성공!\n\n[현재 설정]\n모델: ${model}\n문항유형: ${qMode}\n학습자수준: ${learnerLevel}`);
     } catch (e) {
       alert(String(e?.message || e));
     }
@@ -1117,20 +1169,33 @@ if (MODE !== 'teacher') {
 
   if (MODE === 'teacher') {
     els.applyTopic?.addEventListener('click', onApplyTopic);
+    // live preview of topic on board center (before applying)
+    els.topicInput?.addEventListener('input', () => {
+      const t = (els.topicInput.value || '').trim();
+      const centerText = document.getElementById('centerTopicText');
+      if (!centerText) return;
+      if (state.pack && state.pack.topic) return; // keep applied topic
+      centerText.textContent = t || '주제를 입력하세요';
+    });
+
 
     els.settingsBtn?.addEventListener('click', openDrawer);
-    els.openSettingsInline?.addEventListener('click', openDrawer);
-    els.closeSettings?.addEventListener('click', closeDrawer);
-    els.drawer?.querySelector('.drawer__backdrop')?.addEventListener('click', closeDrawer);
+    els.openSettingsInline?.addEventListener('click', openDrawer);    els.drawer?.querySelector('.drawer__backdrop')?.addEventListener('click', closeDrawer);
 
     els.saveKey?.addEventListener('click', onSaveKey);
     els.deleteKey?.addEventListener('click', onDeleteKey);
     els.getKeyBtn?.addEventListener('click', () => window.open('https://aistudio.google.com/app/apikey', '_blank', 'noopener'));
     els.saveAi?.addEventListener('click', onSaveAi);
+    els.closeSettings?.addEventListener('click', closeDrawer);
     els.testAi?.addEventListener('click', onTestAi);
 
     const cfg = getAiConfig();
     if (els.modelSel) els.modelSel.value = cfg.model;
+    // learner level radios
+    const ll = cfg.learnerLevel || DEFAULTS.learnerLevel;
+    document.querySelectorAll('input[name="learnerLevel"]').forEach((el) => {
+      el.checked = (el.value === ll);
+    });
     if (els.qMode) els.qMode.value = cfg.qMode || DEFAULTS.qMode;
     if (els.showAnswer) els.showAnswer.checked = !!cfg.showAnswer;
     if (els.deckCount) els.deckCount.value = String(cfg.deckCount);
