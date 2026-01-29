@@ -604,14 +604,18 @@ function extractObjectsFromText(text) {
 
 const body = {
   contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  generationConfig: { temperature: 0.6, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+  generationConfig: { temperature: 0.4, maxOutputTokens: 4096, responseMimeType: 'application/json' },
 };
 
 const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
 const raw = await res.text();
 
 if (!res.ok) {
-  if (res.status === 429) throw new Error('Gemini 사용 한도(Quota/Rate limit)로 요청이 차단되었습니다. AI Studio에서 결제/할당량 상태를 확인하세요.');
+  if (res.status === 429) {
+    const ra = Number(res.headers.get('retry-after'));
+    const raMsg = (Number.isFinite(ra) && ra>0) ? `\n권장 대기: ${ra}초` : '';
+    throw new Error('HTTP 429: Gemini 사용 한도(Quota/Rate limit)로 요청이 차단되었습니다.' + raMsg + '\n\n해결: (1) 1~5분 후 재시도 (2) 문제 수를 8~12개로 줄여 테스트 (3) AI Studio/Google Cloud에서 해당 프로젝트의 Generative Language/Vertex AI 쿼터(분당 요청수, 일일 요청수)를 확인하세요.');
+  }
   if (raw.includes('overloaded')) throw new Error('Gemini 모델이 혼잡합니다. 잠시 후 다시 시도하세요.');
   throw new Error(`Gemini 오류: ${raw.slice(0, 400)}`);
 }
@@ -695,21 +699,21 @@ if (!Array.isArray(arr)) {
 
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
-    // Batch size: keep responses small to avoid token limits / 429.
-    // Larger targets use smaller batches for stability.
-    const batchSize = (target >= 80) ? 12 : 16;
+    // Conservative batch size to avoid 429 and huge responses
+    const batchSize = (target >= 60) ? 8 : 10;
 
     const out = [];
     const seen = new Set();
-
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+    // If 429 keeps happening, stop early with a clear message (prevents "forever waiting")
+    let consecutive429 = 0;
+
     async function runOneBatch(n, hintText) {
-      // Retry on 429 with exponential backoff (small, to keep UI responsive)
-      const maxTries = 3;
+      const maxTries = 4;
       for (let attempt = 0; attempt < maxTries; attempt++) {
         try {
-          return await geminiGenerateDeck({
+          const deck = await geminiGenerateDeck({
             topic: hintText,
             count: n,
             model,
@@ -717,24 +721,43 @@ if (!Array.isArray(arr)) {
             qMode,
             learnerLevel,
           });
+          consecutive429 = 0; // reset on success
+          return deck;
         } catch (e) {
           const msg = String(e?.message || e);
-          const is429 = msg.includes('429') || msg.includes('Quota') || msg.includes('Rate limit') || msg.includes('사용 한도');
-          if (!is429 || attempt === maxTries - 1) throw e;
+          const is429 = msg.includes('HTTP 429') || msg.includes('Quota') || msg.includes('Rate limit') || msg.includes('사용 한도');
+          if (!is429) throw e;
 
-          // Backoff: 1.2s → 2.4s → 4.8s
-          const waitMs = Math.min(1200 * Math.pow(2, attempt), 6000);
-          try { logLine(`⏳ AI 사용 한도에 걸려 잠시 대기 후 재시도합니다... (${Math.round(waitMs/1000)}초)`); } catch (_) {}
-          await sleep(waitMs);
+          consecutive429 += 1;
+
+          // Parse suggested wait if present
+          let waitSec = 0;
+          const mm = msg.match(/권장 대기:\s*(\d+)\s*초/);
+          if (mm) waitSec = Number(mm[1]) || 0;
+
+          // Backoff: 5s → 10s → 20s → 40s (cap 60s). If Retry-After exists, prefer it (cap 60s).
+          const backoff = Math.min(5 * Math.pow(2, attempt), 60);
+          const wait = Math.min(Math.max(waitSec || 0, backoff), 60);
+
+          try { logLine(`⏳ AI 사용 한도(429)로 대기 후 재시도합니다... (${wait}초)`); } catch (_) {}
+          await sleep(wait * 1000);
+
+          // If we've hit 429 many times, give up with actionable guidance
+          if (consecutive429 >= 6 && attempt >= 2) {
+            throw new Error(
+              'Gemini 요청이 반복적으로 429(사용 한도)로 차단되고 있습니다.\n\n' +
+              '가능한 원인:\n- 분당/일일 요청 한도 초과\n- 프로젝트 쿼터가 0 또는 매우 낮음\n\n' +
+              '해결 방법:\n1) 3~5분 뒤 다시 시도\n2) 문제 수를 8~12개씩 나눠 생성(여러 번)\n3) AI Studio/Google Cloud에서 해당 프로젝트의 Quota(분당 요청/일일 요청) 확인 및 상향 요청\n\n' +
+              '※ 크레딧이 남아있어도 Quota/Rate limit에 걸리면 호출이 차단될 수 있습니다.'
+            );
+          }
         }
       }
       return [];
     }
 
-    // Hard stop to avoid infinite loops
     let guard = 0;
-
-    while (out.length < target && guard < 40) {
+    while (out.length < target && guard < 60) {
       guard++;
       const remain = target - out.length;
       const n = Math.min(batchSize, remain);
@@ -742,16 +765,13 @@ if (!Array.isArray(arr)) {
       try { logLine(`🤖 문제 생성 중... ${out.length}/${target} (이번 배치 ${n}개)`); } catch (_) {}
 
       const hintText =
-        `${topic}
-` +
-        `(이미 만든 문제와 중복 없이 새 문제만, 남은 개수: ${n}개)
-` +
-        `(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)
-` +
-        `(explain은 1~2문장, 너무 길게 쓰지 말 것)`;
+        `${topic}\n` +
+        `(중복 없이 새 문제만, 이번 배치: ${n}개)\n` +
+        `(JSON 배열만 출력)\n` +
+        `(explain 1문장, answerIndex 정확히)\n` +
+        `(문장/보기는 짧게)`;
 
       const deckPart = await runOneBatch(n, hintText);
-
       if (!deckPart || deckPart.length === 0) break;
 
       for (const q of deckPart) {
@@ -763,35 +783,10 @@ if (!Array.isArray(arr)) {
         if (out.length >= target) break;
       }
 
-      // Gentle pacing to reduce rate limit hits
-      if (out.length < target) await sleep(900);
+      // gentle pacing between batches
+      if (out.length < target) await sleep(1500);
     }
 
-    // Final strict fill if still short
-    if (out.length < target) {
-      const remain = target - out.length;
-      try { logLine(`🔄 부족한 문항 ${remain}개를 추가 생성합니다...`); } catch (_) {}
-
-      const hintText =
-        `${topic}
-` +
-        `(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만.)
-` +
-        `(explain 1문장. explain이 가리키는 정답과 answerIndex가 반드시 일치)`;
-
-      const deckPart = await runOneBatch(remain, hintText);
-
-      for (const q of deckPart || []) {
-        const key = (q.kind + '|' + q.question).slice(0, 200);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        try { fixAnswerIndexByExplain(q); } catch (_) {}
-        out.push(q);
-        if (out.length >= target) break;
-      }
-    }
-
-    // If still short, return whatever we have (but never empty on success paths)
     return out.slice(0, target);
   }
 
@@ -1076,22 +1071,6 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   }
 
   // ---------- teacher: apply topic ----------
-  
-  // --- Auto-batched deck generation to avoid quota/rate limits ---
-  async function generateDeckAuto({ topic, count, model, apiKey, qMode, learnerLevel }) {
-    const MAX_BATCH = 15;
-    const batches = Math.ceil(count / MAX_BATCH);
-    let all = [];
-    for (let i = 0; i < batches; i++) {
-      const c = Math.min(MAX_BATCH, count - i * MAX_BATCH);
-      logLine(`🤖 문제 생성 중 (${i+1}/${batches})...`);
-      const part = await geminiGenerateDeck({ topic, count: c, model, apiKey, qMode, learnerLevel });
-      all = all.concat(part);
-      await new Promise(r => setTimeout(r, 1200));
-    }
-    return all;
-  }
-
   async function onApplyTopic() {
     const topic = (els.topicInput?.value || '').trim();
     if (!topic) { alert('주제를 입력하세요.'); return; }
