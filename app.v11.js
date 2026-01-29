@@ -11,7 +11,7 @@
 
   const DEFAULTS = {
     model: 'gemini-2.0-flash',
-    deckCount: 45,
+    deckCount: 40,
     qMode: 'mcq',
     showAnswer: true,
     activityMinutes: 7,
@@ -700,7 +700,7 @@ if (!Array.isArray(arr)) {
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
     // Conservative batch size to reduce 429 likelihood
-    const batchSize = (target >= 60) ? 8 : 10;
+    let batchSize = (target >= 80) ? 8 : (target >= 60 ? 10 : (target >= 40 ? 12 : 10));
 
     const out = [];
     const seen = new Set();
@@ -749,6 +749,9 @@ if (!Array.isArray(arr)) {
 
           if (attempt > 0 || wait >= 10) { try { logLine(`⏳ 요청이 일시적으로 제한되어 자동 대기 후 재시도합니다... (${wait}초)`); } catch (_) {} }
           await sleep(wait * 1000);
+
+          // If we keep getting 429, reduce batch size to lower load
+          if (attempt >= 1 && batchSize > 6) batchSize = Math.max(6, Math.floor(batchSize * 0.75));
 
           attempt++;
           continue;
