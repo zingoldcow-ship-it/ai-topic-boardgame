@@ -20,6 +20,47 @@
     rows: 6,
     learnerLevel: 'elem_high',
   };
+  // --- Networking helpers ---------------------------------------------------
+  // Gemini API can return 429 when rate-limited or quota-limited.
+  // We retry a few times with exponential backoff to make UX smoother.
+  async function fetchWithRetry(url, options, { retries = 3, baseDelayMs = 900 } = {}) {
+    let lastErr = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetchWithRetry(url, options);
+        if (res.status !== 429) return res;
+
+        // 429: Too Many Requests / Quota / Rate limit
+        const retryAfter = Number(res.headers.get('retry-after'));
+        const delay = Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : Math.round(baseDelayMs * Math.pow(2, attempt) + Math.random() * 250);
+
+        // Consume body (best effort) to avoid leaking streams
+        try { await res.text(); } catch (_) {}
+
+        if (attempt >= retries) return res;
+        await new Promise(r => setTimeout(r, delay));
+      } catch (e) {
+        lastErr = e;
+        if (attempt >= retries) throw lastErr;
+        const delay = Math.round(baseDelayMs * Math.pow(2, attempt) + Math.random() * 250);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+    throw lastErr || new Error('Network error');
+  }
+
+  function formatGeminiError(status, bodyText) {
+    // Keep it short for alert dialogs
+    const head = `Gemini 요청이 차단되었습니다. (HTTP ${status})`;
+    if (status === 429) {
+      return `${head}\n\n원인: 사용 한도(Quota) 또는 속도 제한(Rate limit)에 걸렸습니다.\n해결: 1~2분 뒤 다시 시도하거나, 문제 수를 줄여 테스트하세요.\nAI Studio/Google Cloud에서 Quota 상태도 확인해 주세요.`;
+    }
+    return `${head}\n\n${(bodyText || '').slice(0, 400)}`;
+  }
+  // --------------------------------------------------------------------------
+
 
   // ---------- sound (WebAudio, no external files) ----------
   let audioCtx = null;
@@ -462,6 +503,7 @@ function extractObjectsFromText(text) {
 
   // ---------- state ----------
   const state = {
+    aiBusy: false,
     started: false,
     turn: 0,
     pos: [0,0],
@@ -607,7 +649,7 @@ const body = {
   generationConfig: { temperature: 0.6, maxOutputTokens: 8192, responseMimeType: 'application/json' },
 };
 
-const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+const res = await fetchWithRetry(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
 const raw = await res.text();
 
 if (!res.ok) {
