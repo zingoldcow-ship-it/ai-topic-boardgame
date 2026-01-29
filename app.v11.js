@@ -614,7 +614,7 @@ if (!res.ok) {
   if (res.status === 429) {
     const ra = Number(res.headers.get('retry-after'));
     const raMsg = (Number.isFinite(ra) && ra>0) ? `\n권장 대기: ${ra}초` : '';
-    throw new Error('HTTP 429: Gemini 사용 한도(Quota/Rate limit)로 요청이 차단되었습니다.' + raMsg + '\n\n해결: (1) 1~5분 후 재시도 (2) 문제 수를 8~12개로 줄여 테스트 (3) AI Studio/Google Cloud에서 해당 프로젝트의 Generative Language/Vertex AI 쿼터(분당 요청수, 일일 요청수)를 확인하세요.');
+    throw new Error('HTTP 429: Gemini 요청이 일시적으로 제한되었습니다.' + raMsg + '\n\n해결: (1) 1~5분 후 재시도 (2) 문제 수를 8~12개로 줄여 테스트 (3) AI Studio/Google Cloud에서 해당 프로젝트의 Generative Language/Vertex AI 쿼터(분당 요청수, 일일 요청수)를 확인하세요.');
   }
   if (raw.includes('overloaded')) throw new Error('Gemini 모델이 혼잡합니다. 잠시 후 다시 시도하세요.');
   throw new Error(`Gemini 오류: ${raw.slice(0, 400)}`);
@@ -747,7 +747,7 @@ if (!Array.isArray(arr)) {
           const backoff = Math.min(5 * Math.pow(2, attempt), 60);
           const wait = Math.min(Math.max(waitSec || 0, backoff), 60);
 
-          try { logLine(`⏳ AI 사용 한도(429)로 자동 대기 후 재시도합니다... (${wait}초)`); } catch (_) {}
+          if (attempt > 0 || wait >= 10) { try { logLine(`⏳ 요청이 일시적으로 제한되어 자동 대기 후 재시도합니다... (${wait}초)`); } catch (_) {} }
           await sleep(wait * 1000);
 
           attempt++;
@@ -1154,7 +1154,25 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
-      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode, learnerLevel });
+      // Auto-retry on 429 so teachers don't see confusing "first fail, second success"
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+      let lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode, learnerLevel });
+          lastErr = null;
+          break;
+        } catch (e) {
+          const msg = String(e?.message || e);
+          const is429 = msg.includes('429') || msg.includes('Quota') || msg.includes('Rate limit') || msg.includes('제한');
+          lastErr = e;
+          if (!is429) break;
+          const wait = Math.min(5 * Math.pow(2, attempt), 20); // 5s,10s,20s
+          try { logLine(`⏳ (연결 테스트) 요청이 일시적으로 제한되어 ${wait}초 후 자동 재시도합니다...`); } catch (_) {}
+          await sleep(wait * 1000);
+        }
+      }
+      if (lastErr) throw lastErr;
       alert(`연결 성공!\n\n[현재 설정]\n모델: ${model}\n문항유형: ${qMode}\n학습자수준: ${learnerLevel}`);
     } catch (e) {
       alert(String(e?.message || e));
