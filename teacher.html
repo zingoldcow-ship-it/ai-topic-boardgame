@@ -160,8 +160,8 @@
             <div class="formGroup">
               <div class="setting-label">모델</div>
               <select id="geminiModel">
-                <option value="gemini-2.0-flash">gemini-2.0-flash (빠른 생성 · 다양한 문제)</option>
-                <option value="gemini-1.5-flash">gemini-1.5-flash (안정적 형식 · 시험용)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
               </select>
             </div>
 
@@ -208,8 +208,8 @@
 
           <div class="formGrid">
             <div class="formGroup">
-              <div class="setting-label">문제 수 <span class="setting-sub">(총 문항 수 · 45개 이상 권장)</span></div>
-              <input id="deckCount" type="number" min="6" max="200" value="45" />
+              <div class="setting-label">문제 수 <span class="setting-sub">(덱 총 문항 수)</span></div>
+              <input id="deckCount" type="number" min="6" max="200" value="30" />
               <div class="help">덱 소진형: 문제칸 도착 시 다음 문제가 출제됩니다.</div>
             </div>
 
@@ -237,6 +237,6 @@
 
   <script src="./gate.js"></script>
   <script>TeacherGate.requireAuthOnTeacherPage({homeUrl:"./index.html"});</script>
-  <script src="./app.v11.js?v=12"></script>
+  <script src="./app.v9.js"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
 
   const DEFAULTS = {
     model: 'gemini-2.0-flash',
-    deckCount: 45,
+    deckCount: 30,
     qMode: 'mcq',
     showAnswer: true,
     activityMinutes: 7,
@@ -302,8 +302,6 @@ function extractObjectsFromText(text) {
   function getAiConfig() {
     const raw = localStorage.getItem(STORAGE.aiConfig);
     const cfg = raw ? safeJsonParse(raw) : null;
-    // migrate legacy default (30) → new default (45)
-    if (cfg && Number(cfg.deckCount) === 30) cfg.deckCount = 45;
     return {
       model: cfg?.model || DEFAULTS.model,
       qMode: cfg?.qMode || DEFAULTS.qMode,
