@@ -694,22 +694,21 @@ if (!Array.isArray(arr)) {
 
 
   // Generate deck in batches to reliably reach requested count (avoids token truncation).
-  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel, existingDeck }) {
+  async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel }) {
     learnerLevel = learnerLevel || DEFAULTS.learnerLevel;
 
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
-    // Start with existing deck (for resume / top-up)
-    const out = Array.isArray(existingDeck) ? existingDeck : [];
-    const seen = new Set((out || []).map(q => ((q?.kind || 'mcq') + '|' + (q?.question || '')).slice(0, 200)));
+    // Conservative batch size to reduce 429 likelihood
+    const batchSize = (target >= 60) ? 8 : 10;
 
-    // Smaller batches reduce 429 probability.
-    const batchSize = (target >= 60) ? 6 : 8;
-
+    const out = [];
+    const seen = new Set();
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-    // Auto-retry budget: keep trying for up to N minutes so teachers don't need to click again.
-    const budgetMs = 8 * 60 * 1000; // 8 minutes
+    // Auto retry budget so teachers don't need extra clicks.
+    // If quota is tight, this may wait a bit and keep going.
+    const budgetMs = 6 * 60 * 1000; // 6 minutes
     const startedAt = Date.now();
 
     async function runOneBatch(n, hintText) {
@@ -730,32 +729,26 @@ if (!Array.isArray(arr)) {
           const is429 = msg.includes('HTTP 429') || msg.includes('Quota') || msg.includes('Rate limit') || msg.includes('사용 한도');
           if (!is429) throw e;
 
-          // Stop if time budget exceeded
           const elapsed = Date.now() - startedAt;
           if (elapsed > budgetMs) {
-            throw new Error('HTTP 429: AI 사용 한도(Quota/Rate limit)로 인해 일정 시간 동안 재시도했지만 완료하지 못했습니다.\n\n현재까지 만든 문제는 저장되었고, 잠시 후 다시 시도하면 부족분만 이어서 생성됩니다.');
+            throw new Error(
+              'HTTP 429: Gemini 사용 한도(Quota/Rate limit)로 요청이 반복 차단되어 자동 재시도 시간(약 6분)을 초과했습니다.\n\n' +
+              '해결: 1~5분 후 다시 시도하거나, 문제 수를 10~20개로 낮춰 생성 후 여러 번 합쳐 주세요.\n' +
+              '또는 AI Studio/Google Cloud에서 해당 프로젝트 Quota(분당/일일 요청) 확인이 필요합니다.'
+            );
           }
 
-          // Prefer Retry-After suggestion if present
+          // Prefer "권장 대기" if we have it, else exponential backoff.
           let waitSec = 0;
           const mm = msg.match(/권장 대기:\s*(\d+)\s*초/);
           if (mm) waitSec = Number(mm[1]) || 0;
 
-          // Backoff with cap (sec): 10 → 20 → 40 → 60 → 60 ...
-          const backoff = Math.min(10 * Math.pow(2, attempt), 60);
-          const wait = Math.min(Math.max(waitSec || 0, backoff), 90);
+          // Backoff seconds: 5 → 10 → 20 → 40 → 60 (cap 60)
+          const backoff = Math.min(5 * Math.pow(2, attempt), 60);
+          const wait = Math.min(Math.max(waitSec || 0, backoff), 60);
 
-          // Show a visible countdown in log (best effort)
-          try {
-            logLine(`⏳ AI 사용 한도(429)로 잠시 대기 후 자동으로 이어서 생성합니다... (${wait}초)`);
-          } catch (_) {}
-
-          // Countdown ticks (optional, lightweight)
-          const ticks = Math.min(wait, 10);
-          for (let i = 0; i < ticks; i++) {
-            await sleep(1000);
-          }
-          if (wait > ticks) await sleep((wait - ticks) * 1000);
+          try { logLine(`⏳ AI 사용 한도(429)로 자동 대기 후 재시도합니다... (${wait}초)`); } catch (_) {}
+          await sleep(wait * 1000);
 
           attempt++;
           continue;
@@ -764,7 +757,7 @@ if (!Array.isArray(arr)) {
     }
 
     let guard = 0;
-    while (out.length < target && guard < 120) {
+    while (out.length < target && guard < 80) {
       guard++;
       const remain = target - out.length;
       const n = Math.min(batchSize, remain);
@@ -779,18 +772,19 @@ if (!Array.isArray(arr)) {
         `(문장/보기는 짧게)`;
 
       const deckPart = await runOneBatch(n, hintText);
+      if (!deckPart || deckPart.length === 0) break;
 
-      for (const q of deckPart || []) {
-        const key = ((q?.kind || 'mcq') + '|' + (q?.question || '')).slice(0, 200);
-        if (!q?.question || seen.has(key)) continue;
+      for (const q of deckPart) {
+        const key = (q.kind + '|' + q.question).slice(0, 200);
+        if (seen.has(key)) continue;
         seen.add(key);
         try { fixAnswerIndexByExplain(q); } catch (_) {}
         out.push(q);
         if (out.length >= target) break;
       }
 
-      // Gentle pacing between batches to reduce rate limit hits
-      if (out.length < target) await sleep(1800);
+      // Gentle pacing between batches
+      if (out.length < target) await sleep(1500);
     }
 
     return out.slice(0, target);
@@ -1088,20 +1082,6 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     const model = els.modelSel?.value || cfg.model;
     const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
 
-    // Ensure state.pack exists early so partial progress can be retained on 429
-    if (!state.pack || state.pack.topic !== topic) {
-      state.pack = { version: 3, topic, createdAt: nowStamp(), model, settings: {}, deck: [] };
-    }
-    // Keep settings synced while generating
-    const aiCfgPre = getAiConfig() || {};
-    state.pack.model = model;
-    state.pack.settings = {
-      showAnswer: aiCfgPre.showAnswer ?? true,
-      qMode: aiCfgPre.qMode || DEFAULTS.qMode,
-      activityMinutes: getConfiguredMinutes(),
-      learnerLevel: (aiCfgPre.learnerLevel || DEFAULTS.learnerLevel),
-    };
-
     els.applyTopic.disabled = true;
     els.applyTopic.textContent = '생성 중...';
 
@@ -1109,37 +1089,14 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       const aiCfg0 = getAiConfig() || {};
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
       const learnerLevel = (getAiConfig()?.learnerLevel) || (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
-      // If we already have a pack for this topic, we can resume/top-up instead of starting over
-      const existingDeck = (state.pack && state.pack.topic === topic && Array.isArray(state.pack.deck)) ? state.pack.deck : [];
-      const need = Math.max(0, count - existingDeck.length);
-
-      let deck = existingDeck;
-      if (need > 0) {
-        deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel, existingDeck });
-      }
-      // If user requested fewer than existing, trim
-      deck = deck.slice(0, count);
+      const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel });
       const aiCfg = getAiConfig() || {};
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
       alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
     } catch (e) {
-      const msg = String(e?.message || e);
-      // If we have partial results, keep them and guide the teacher to retry later
-      const currentDeck = (state.pack && Array.isArray(state.pack.deck)) ? state.pack.deck : [];
-      if (currentDeck.length > 0 && msg.includes('429')) {
-        alert(
-          'AI 사용 한도(429)로 인해 생성이 중단되었습니다.
-
-' +
-          `현재까지 생성된 문제: ${currentDeck.length}개
-` +
-          '잠시(1~5분) 후 다시 [문제 생성]을 누르면, 부족한 개수만 자동으로 이어서 생성합니다.'
-        );
-      } else {
-        alert(msg);
-      }
+      alert(String(e?.message || e));
     } finally {
       els.applyTopic.disabled = false;
       els.applyTopic.textContent = '문제 생성';
