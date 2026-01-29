@@ -691,62 +691,107 @@ if (!Array.isArray(arr)) {
 
   // Generate deck in batches to reliably reach requested count (avoids token truncation).
   async function geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel }) {
+    learnerLevel = learnerLevel || DEFAULTS.learnerLevel;
+
     const target = clamp(Number(count) || DEFAULTS.deckCount, 6, 200);
 
-    // batch size to stay within token limits
-    const batchSize = Math.min(16, target);
+    // Batch size: keep responses small to avoid token limits / 429.
+    // Larger targets use smaller batches for stability.
+    const batchSize = (target >= 80) ? 12 : 16;
+
     const out = [];
     const seen = new Set();
 
-    // hard stop to avoid infinite loops
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    async function runOneBatch(n, hintText) {
+      // Retry on 429 with exponential backoff (small, to keep UI responsive)
+      const maxTries = 3;
+      for (let attempt = 0; attempt < maxTries; attempt++) {
+        try {
+          return await geminiGenerateDeck({
+            topic: hintText,
+            count: n,
+            model,
+            apiKey,
+            qMode,
+            learnerLevel,
+          });
+        } catch (e) {
+          const msg = String(e?.message || e);
+          const is429 = msg.includes('429') || msg.includes('Quota') || msg.includes('Rate limit') || msg.includes('사용 한도');
+          if (!is429 || attempt === maxTries - 1) throw e;
+
+          // Backoff: 1.2s → 2.4s → 4.8s
+          const waitMs = Math.min(1200 * Math.pow(2, attempt), 6000);
+          try { logLine(`⏳ AI 사용 한도에 걸려 잠시 대기 후 재시도합니다... (${Math.round(waitMs/1000)}초)`); } catch (_) {}
+          await sleep(waitMs);
+        }
+      }
+      return [];
+    }
+
+    // Hard stop to avoid infinite loops
     let guard = 0;
-    while (out.length < target && guard < 30) {
+
+    while (out.length < target && guard < 40) {
       guard++;
       const remain = target - out.length;
       const n = Math.min(batchSize, remain);
 
-      const deckPart = await geminiGenerateDeck({
-        topic: `${topic}\n(이미 만든 문제와 중복 없이 새 문제만, 남은 개수: ${n}개)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
-        count: n,
-        model,
-        apiKey,
-        qMode
-      });
+      try { logLine(`🤖 문제 생성 중... ${out.length}/${target} (이번 배치 ${n}개)`); } catch (_) {}
+
+      const hintText =
+        `${topic}
+` +
+        `(이미 만든 문제와 중복 없이 새 문제만, 남은 개수: ${n}개)
+` +
+        `(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)
+` +
+        `(explain은 1~2문장, 너무 길게 쓰지 말 것)`;
+
+      const deckPart = await runOneBatch(n, hintText);
+
+      if (!deckPart || deckPart.length === 0) break;
 
       for (const q of deckPart) {
         const key = (q.kind + '|' + q.question).slice(0, 200);
         if (seen.has(key)) continue;
         seen.add(key);
-        try { fixAnswerIndexByExplain(q); } catch(e) {}
+        try { fixAnswerIndexByExplain(q); } catch (_) {}
         out.push(q);
         if (out.length >= target) break;
       }
 
-      // if Gemini returned nothing usable, stop
-      if (!deckPart || deckPart.length === 0) break;
+      // Gentle pacing to reduce rate limit hits
+      if (out.length < target) await sleep(900);
     }
 
     // Final strict fill if still short
     if (out.length < target) {
       const remain = target - out.length;
-      const deckPart = await geminiGenerateDeck({
-        topic: `${topic}\n(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만. explain 1문장)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
-        count: remain,
-        model,
-        apiKey,
-        qMode
-      });
+      try { logLine(`🔄 부족한 문항 ${remain}개를 추가 생성합니다...`); } catch (_) {}
 
-      for (const q of deckPart) {
+      const hintText =
+        `${topic}
+` +
+        `(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만.)
+` +
+        `(explain 1문장. explain이 가리키는 정답과 answerIndex가 반드시 일치)`;
+
+      const deckPart = await runOneBatch(remain, hintText);
+
+      for (const q of deckPart || []) {
         const key = (q.kind + '|' + q.question).slice(0, 200);
         if (seen.has(key)) continue;
         seen.add(key);
-        try { fixAnswerIndexByExplain(q); } catch(e) {}
+        try { fixAnswerIndexByExplain(q); } catch (_) {}
         out.push(q);
         if (out.length >= target) break;
       }
     }
 
+    // If still short, return whatever we have (but never empty on success paths)
     return out.slice(0, target);
   }
 
@@ -1031,6 +1076,22 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   }
 
   // ---------- teacher: apply topic ----------
+  
+  // --- Auto-batched deck generation to avoid quota/rate limits ---
+  async function generateDeckAuto({ topic, count, model, apiKey, qMode, learnerLevel }) {
+    const MAX_BATCH = 15;
+    const batches = Math.ceil(count / MAX_BATCH);
+    let all = [];
+    for (let i = 0; i < batches; i++) {
+      const c = Math.min(MAX_BATCH, count - i * MAX_BATCH);
+      logLine(`🤖 문제 생성 중 (${i+1}/${batches})...`);
+      const part = await geminiGenerateDeck({ topic, count: c, model, apiKey, qMode, learnerLevel });
+      all = all.concat(part);
+      await new Promise(r => setTimeout(r, 1200));
+    }
+    return all;
+  }
+
   async function onApplyTopic() {
     const topic = (els.topicInput?.value || '').trim();
     if (!topic) { alert('주제를 입력하세요.'); return; }
