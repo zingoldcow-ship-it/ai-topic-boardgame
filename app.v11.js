@@ -578,7 +578,50 @@ function extractObjectsFromText(text) {
   }
 
   // ---------- gemini (teacher) ----------
-  async function geminiGenerateDeck({topic, count, model, apiKey, qMode, learnerLevel}) {
+  
+  // --- Gemini API caller (v1beta with fallback to v1) ------------------------
+  async function callGenerateContent({ apiKey, model, body }) {
+    const endpoints = [
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
+    ];
+
+    let lastText = '';
+    for (let i = 0; i < endpoints.length; i++) {
+      const url = endpoints[i];
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      // If model not found on v1beta, try v1.
+      if (res.ok) {
+        return { res, json: await res.json(), usedUrl: url };
+      }
+
+      // Capture error payload for decision making
+      const text = await (async()=>{ try { return await res.text(); } catch(_) { return ''; } })();
+      lastText = text;
+
+      // If 404 NOT_FOUND for v1beta, continue to v1. Otherwise throw now.
+      const isNotFound = res.status === 404 && (text.includes('NOT_FOUND') || text.includes('not found'));
+      if (isNotFound && i < endpoints.length - 1) continue;
+
+      // 429 handled by caller (existing logic), but we keep status and body
+      const err = new Error(`Gemini 오류: ${text || res.status}`);
+      err.status = res.status;
+      err.body = text;
+      throw err;
+    }
+
+    const err = new Error(`Gemini 오류: ${lastText || 'unknown'}`);
+    err.status = 0;
+    err.body = lastText;
+    throw err;
+  }
+  // --------------------------------------------------------------------------
+async function geminiGenerateDeck({topic, count, model, apiKey, qMode, learnerLevel}) {
     learnerLevel = learnerLevel || DEFAULTS.learnerLevel;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const prompt = [
