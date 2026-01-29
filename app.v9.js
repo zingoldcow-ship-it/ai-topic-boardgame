@@ -304,7 +304,10 @@ function extractObjectsFromText(text) {
     const raw = localStorage.getItem(STORAGE.aiConfig);
     const cfg = raw ? safeJsonParse(raw) : null;
     // migrate legacy default (30) → new default (45)
-    if (cfg && Number(cfg.deckCount) === 30) cfg.deckCount = 45;
+    if (cfg && Number(cfg.deckCount) === 30) {
+      cfg.deckCount = 45;
+      try { localStorage.setItem(STORAGE.aiConfig, JSON.stringify(cfg)); } catch {}
+    }
     return {
       model: cfg?.model || DEFAULTS.model,
       learnerLevel: cfg?.learnerLevel || DEFAULTS.learnerLevel,
@@ -570,7 +573,7 @@ function extractObjectsFromText(text) {
   }
 
   // ---------- gemini (teacher) ----------
-  async function geminiGenerateDeck({topic, count, model, apiKey, qMode}) {
+  async function geminiGenerateDeck({topic, count, model, apiKey, qMode, learnerLevel}) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const prompt = [
       (learnerLevel === 'elem_low') ? '당신은 초등 1~3학년 수업용 퀴즈 제작자입니다.'
@@ -720,13 +723,7 @@ if (!Array.isArray(arr)) {
     // Final strict fill if still short
     if (out.length < target) {
       const remain = target - out.length;
-      const deckPart = await geminiGenerateDeck({
-        topic: `${topic}\n(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만. explain 1문장)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`,
-        count: remain,
-        model,
-        apiKey,
-        qMode
-      });
+      const deckPart = await geminiGenerateDeck({ topic: `${topic}\n(부족한 ${remain}개를 채우기. 중복 금지. JSON 배열만. explain 1문장)\n(각 문항에서 explain이 가리키는 정답과 answerIndex가 반드시 일치)`, count: remain, model, apiKey, qMode, learnerLevel });
 
       for (const q of deckPart) {
         const key = (q.kind + '|' + q.question).slice(0, 200);
@@ -1105,7 +1102,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
-      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode });
+      await geminiGenerateDeck({ topic: '연결 테스트', count: 2, model, apiKey, qMode, learnerLevel });
       alert('연결 성공!');
     } catch (e) {
       alert(String(e?.message || e));
