@@ -1332,6 +1332,9 @@ if (MODE !== 'teacher') {
 
 
 
+
+
+
 // --- UX hotfix for Teacher Auth screen --------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   // 1) Add home icon to any button labeled '홈'
@@ -1341,30 +1344,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 2) Tint ONLY the "관리자 초기화" card (not the whole auth screen)
-  // Find an element whose text is exactly "관리자 초기화" then style its closest card/container.
-  const resetLabelEls = Array.from(document.querySelectorAll('*')).filter(el => {
-    const t = (el.textContent || '').trim();
-    // Prefer headings/spans that are exactly the label
-    return t === '관리자 초기화' && el.children.length === 0;
+  // 2) Tint ONLY the "초기화" BUTTON inside the "관리자 초기화" card
+  // Find a container that includes the label text, then tint its reset button.
+  const containers = Array.from(document.querySelectorAll('div, section, article')).filter(el => {
+    const t = (el.textContent || '');
+    return t.includes('관리자 초기화') && t.includes('공용 PC');
   });
 
-  if (resetLabelEls.length) {
-    const labelEl = resetLabelEls[0];
-    // Try to find a nearby container that looks like a card (div/section with border)
-    let card = labelEl.closest('section, div, article');
-    // Walk up a bit to find the most specific container that doesn't include the whole page
-    let steps = 0;
-    while (card && steps < 4) {
-      const rect = card.getBoundingClientRect();
-      // Avoid huge containers (like the whole modal/page)
-      if (rect.width < window.innerWidth * 0.95 && rect.height < window.innerHeight * 0.7) break;
-      card = card.parentElement?.closest('section, div, article');
-      steps++;
+  const container = containers[0] || null;
+  if (container) {
+    // Ensure container background stays default (do not tint the card)
+    container.style.background = '';
+    // Find a button whose visible text is "초기화"
+    const btn = Array.from(container.querySelectorAll('button')).find(b => (b.textContent || '').trim() === '초기화');
+    if (btn) {
+      btn.style.background = '#ffe6ee';
+      btn.style.borderColor = '#ffd0dd';
     }
-    if (card) {
-      card.style.background = '#fff1f4';
-      card.style.borderRadius = '12px';
+  } else {
+    // Fallback: find any "초기화" button and style it if it is near "관리자 초기화"
+    const resetBtns = Array.from(document.querySelectorAll('button')).filter(b => (b.textContent || '').trim() === '초기화');
+    for (const btn of resetBtns) {
+      const wrap = btn.closest('div, section, article');
+      if (wrap && (wrap.textContent || '').includes('관리자 초기화')) {
+        wrap.style.background = '';
+        btn.style.background = '#ffe6ee';
+        btn.style.borderColor = '#ffd0dd';
+        break;
+      }
     }
   }
 });
