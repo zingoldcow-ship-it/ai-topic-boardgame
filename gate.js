@@ -17,6 +17,10 @@
     'TOPIC_BOARDGAME_AI_CONFIG_V1',
     'TOPIC_BOARDGAME_PACK_V2',
     'TOPIC_BOARDGAME_STATE_V1',
+    // Teacher gate / pass / auth
+    'TOPIC_BOARDGAME_TEACHER_GATE_DONE_V1',
+    'TOPIC_BOARDGAME_TEACHER_PASS_HASH_V1',
+    'TOPIC_BOARDGAME_TEACHER_AUTH_V1',
   ];
 
   const DEFAULT_SETUP_KEY = 'abcd1234';
@@ -68,6 +72,10 @@
           <div class="row" style="margin-top:10px; justify-content:flex-end;">
             <button class="btn primary" id="gatePassOk" type="button">확인</button>
           </div>
+
+          <style>
+            #gateResetBtn{ background:#ffe6ee; border-color:#ffd0dd; }
+          </style>
 
           <div class="resetCard" aria-label="관리자 초기화">
             <div class="resetCardTitle">관리자 초기화</div>
@@ -300,18 +308,14 @@
       }
 
       if (isResetFlow){
-        // Clear teacher auth + AI config + saved questions so a different teacher can start fresh on the same device.
+        // Clear teacher auth + AI config so a different teacher can start fresh on the same device.
         try {
           localStorage.removeItem(LS.passHash);
           localStorage.removeItem(LS.gateDone);
           RESET_KEYS.forEach(k => localStorage.removeItem(k));
         } catch (e) {}
         try { sessionStorage.removeItem(SS.authed); } catch (e) {}
-
-        // Hard refresh to clear in-memory state and UI (API dots, loaded pack, etc.)
-        try { alert('초기화 완료!\n이 기기의 저장된 비밀번호/설정/API 키/문제 파일을 모두 삭제했습니다.\n\n새로 시작합니다.'); } catch (e) {}
-        try { location.reload(); } catch (e) { window.location.href = homeUrl || './index.html'; }
-        return;
+        isResetFlow = false;
       }
 
       localStorage.setItem(LS.gateDone, '1');
@@ -351,13 +355,15 @@
     confirmCancel && (confirmCancel.onclick = () => closeConfirm());
     confirmOk && (confirmOk.onclick = () => {
       closeConfirm();
-      // require setup key again
-      isResetFlow = true;
-      goto('setupKey');
-      setMsg('관리자 초기화를 진행합니다. 초기 설정키를 입력하면 교사용 비밀번호, Gemini API 키, 설정값이 초기화됩니다.');
-    });
+      try {
+        RESET_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+        try { sessionStorage.clear(); } catch (_) {}
+      } catch (_) {}
 
-    confirmWrap && confirmWrap.querySelector('.gate-confirm__backdrop')?.addEventListener('click', closeConfirm);
+      alert('초기화 완료!\n이 기기의 저장된 비밀번호/설정/API 키/문제 파일을 모두 삭제했습니다.\n\n새로 시작합니다.');
+      location.reload();
+    });
+confirmWrap && confirmWrap.querySelector('.gate-confirm__backdrop')?.addEventListener('click', closeConfirm);
 
     $('#gateSet1Next', modal).onclick = () => {
       if (pin1.length !== 6){
@@ -436,7 +442,7 @@
         homeBtn.id='gateHomeBtn';
         homeBtn.type='button';
         homeBtn.className='btn';
-        homeBtn.textContent='홈';
+        homeBtn.textContent='🏠 홈';
         homeBtn.style.padding='8px 10px';
         homeBtn.onclick = ()=>{ window.location.href = homeUrl; };
         head.insertBefore(homeBtn, head.lastElementChild); // before close (which is hidden)

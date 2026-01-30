@@ -1343,7 +1343,3 @@ body[data-mode="landing"] .usageCard .usageDesc{
   text-overflow: ellipsis;
   display: block;
 }
-
-/* Keep the 'no pack' badge compact and single-line */
-.packBadge { white-space: nowrap; }
-.packBadge .muted { font-size: 12px; }
