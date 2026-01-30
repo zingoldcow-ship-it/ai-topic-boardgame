@@ -1326,3 +1326,24 @@ if (MODE !== 'teacher') {
     setTimer();
   }
 })();
+
+
+
+// --- UX hotfix for Teacher Auth screen --------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  // 1) Add home icon to any button labeled '홈'
+  document.querySelectorAll('button').forEach(btn => {
+    if (btn.textContent.trim() === '홈' && !btn.textContent.includes('🏠')) {
+      btn.textContent = '🏠 홈';
+    }
+  });
+
+  // 2) Tint admin reset card background (by text match)
+  document.querySelectorAll('div').forEach(div => {
+    if (div.textContent && div.textContent.includes('관리자 초기화')) {
+      div.style.background = '#fff1f4';
+      div.style.borderRadius = '12px';
+    }
+  });
+});
+// ---------------------------------------------------------------------------
