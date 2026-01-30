@@ -611,6 +611,9 @@ body{
 }
 .packBadge{background:var(--lavender); }
 
+
+.packStatus{font-size:12px; padding:6px 10px; white-space:nowrap;}
+.packStatus .muted{font-size:12px;}
 .muted{ color: var(--muted); }
 
 /* Teacher gate */

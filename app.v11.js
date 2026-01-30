@@ -1165,7 +1165,8 @@ const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
   }
 
   function onSaveAi() {
-const qMode = els.qMode?.value || DEFAULTS.qMode;
+    const model = els.modelSel?.value || DEFAULTS.model;
+    const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
     const showAnswer = !!(els.showAnswer?.checked);
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
