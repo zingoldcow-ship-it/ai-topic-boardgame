@@ -1206,7 +1206,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     const resolvedModel = resolveModel(model, state.availableModels);
     if (resolvedModel && resolvedModel !== model) {
       try { if (els.modelSel) els.modelSel.value = resolvedModel; } catch (_) {}
-      alert(`선택한 모델이 현재 API에서 사용 불가하여, 자동으로 \"${resolvedModel}\" 모델로 전환했습니다.`);
+      try { logLine(`ℹ️ 선택한 모델이 현재 API에서 사용 불가하여 '${resolvedModel}'로 자동 전환했습니다.`); } catch (_) {}
       model = resolvedModel;
     }
       // Auto-retry on 429 so teachers don't see confusing "first fail, second success"

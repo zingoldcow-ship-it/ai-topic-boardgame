@@ -300,14 +300,18 @@
       }
 
       if (isResetFlow){
-        // Clear teacher auth + AI config so a different teacher can start fresh on the same device.
+        // Clear teacher auth + AI config + saved questions so a different teacher can start fresh on the same device.
         try {
           localStorage.removeItem(LS.passHash);
           localStorage.removeItem(LS.gateDone);
           RESET_KEYS.forEach(k => localStorage.removeItem(k));
         } catch (e) {}
         try { sessionStorage.removeItem(SS.authed); } catch (e) {}
-        isResetFlow = false;
+
+        // Hard refresh to clear in-memory state and UI (API dots, loaded pack, etc.)
+        try { alert('초기화 완료!\n이 기기의 저장된 비밀번호/설정/API 키/문제 파일을 모두 삭제했습니다.\n\n새로 시작합니다.'); } catch (e) {}
+        try { location.reload(); } catch (e) { window.location.href = homeUrl || './index.html'; }
+        return;
       }
 
       localStorage.setItem(LS.gateDone, '1');
