@@ -1139,7 +1139,8 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
       applyPack(pack, {resetDeck:true});
       saveLastPack(pack);
-      alert(`완료!\n"${topic}" 문제 ${deck.length}개 생성됨\n학생용 페이지에서는 ‘문제 파일 저장’ 후 불러오기만 하면 됩니다.`);
+      alert(`완료!
+${topic} 문제 ${count}개 생성됨`);
     } catch (e) {
       alert(String(e?.message || e));
     } finally {
