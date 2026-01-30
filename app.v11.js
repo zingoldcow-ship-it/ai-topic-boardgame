@@ -1112,7 +1112,7 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     if (!apiKey) { alert('Gemini API 키가 필요합니다. [설정]에서 API 키를 저장한 뒤 다시 시도하세요.'); refreshSetupHint(); return; }
 
     const cfg = getAiConfig();
-const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
+    const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
 
     els.applyTopic.disabled = true;
     els.applyTopic.textContent = '생성 중...';
@@ -1122,16 +1122,18 @@ const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
       const learnerLevel = (getAiConfig()?.learnerLevel) || (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
 
-    // Load available model list once (best effort)
-    if (!state.availableModels) {
-      try { state.availableModels = await listAvailableModels(apiKey); } catch (_) { state.availableModels = null; }
-    }
-    const resolvedModel = resolveModel(model, state.availableModels);
-    if (resolvedModel && resolvedModel !== model) {
-      try { if (els.modelSel) els.modelSel.value = resolvedModel; } catch (_) {}
-      try { logLine(`ℹ️ 선택한 모델이 사용 불가하여 '${resolvedModel}'로 자동 전환했습니다.`); } catch (_) {}
-      model = resolvedModel;
-    }
+      let model = aiCfg0.model || (els.modelSel?.value) || DEFAULTS.model;
+
+      // Load available model list once (best effort)
+      if (!state.availableModels) {
+        try { state.availableModels = await listAvailableModels(apiKey); } catch (_) { state.availableModels = null; }
+      }
+      const resolvedModel = resolveModel(model, state.availableModels);
+      if (resolvedModel && resolvedModel !== model) {
+        try { if (els.modelSel) els.modelSel.value = resolvedModel; } catch (_) {}
+        try { logLine(`ℹ️ 선택한 모델이 사용 불가하여 '${resolvedModel}'로 자동 전환했습니다.`); } catch (_) {}
+        model = resolvedModel;
+      }
       const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel });
       const aiCfg = getAiConfig() || {};
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
