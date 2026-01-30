@@ -1376,3 +1376,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 // ---------------------------------------------------------------------------
+\n\n
+// --- UX compact notice for missing question file ----------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('div, p, span').forEach(el => {
+    const t = (el.textContent || '').trim();
+    if (t === '문제 파일이 없습니다 (문제 생성 또는 불러오기)') {
+      el.style.fontSize = '12px';
+      el.style.whiteSpace = 'nowrap';
+    }
+  });
+});
+// ---------------------------------------------------------------------------
