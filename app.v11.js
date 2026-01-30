@@ -790,25 +790,35 @@ if (!Array.isArray(arr)) {
     }
 
     let guard = 0;
-    while (out.length < target && guard < 80) {
+    let noProgress = 0; // counts consecutive batches that add 0 new questions (usually due to duplicates)
+    while (out.length < target && guard < 120) {
       guard++;
       const remain = target - out.length;
-      const n = Math.min(batchSize, remain);
 
-      try { logLine(`🤖 문제 생성 중... ${out.length}/${target} (이번 배치 ${n}개)`); } catch (_) {}
+      // When remain is small (1~2), asking for only 1 can easily produce duplicates.
+      // So we request a few more and keep only the unique ones we need.
+      const requestN = Math.min(Math.max(3, remain), Math.max(3, batchSize));
+
+      const before = out.length;
+      try { logLine(`🤖 문제 생성 중... ${out.length}/${target} (이번 배치 ${requestN}개)`); } catch (_) {}
+
+      // Add a nonce so the model is nudged to vary outputs, especially near the end.
+      const nonce = Math.random().toString(36).slice(2, 8);
 
       const hintText =
         `${topic}\n` +
-        `(중복 없이 새 문제만, 이번 배치: ${n}개)\n` +
+        `(중복 없이 '완전히 새로운' 문제만, 이번 배치: ${requestN}개)\n` +
+        `(이전과 유사하면 주제/상황/표현을 바꿔서 새로 만들기)\n` +
+        `(nonce:${nonce})\n` +
         `(JSON 배열만 출력)\n` +
         `(explain 1문장, answerIndex 정확히)\n` +
         `(문장/보기는 짧게)`;
 
-      const deckPart = await runOneBatch(n, hintText);
+      const deckPart = await runOneBatch(requestN, hintText);
       if (!deckPart || deckPart.length === 0) break;
 
       for (const q of deckPart) {
-        const key = (q.kind + '|' + q.question).slice(0, 200);
+        const key = (q.kind + '|' + q.question).slice(0, 220);
         if (seen.has(key)) continue;
         seen.add(key);
         try { fixAnswerIndexByExplain(q); } catch (_) {}
@@ -816,8 +826,22 @@ if (!Array.isArray(arr)) {
         if (out.length >= target) break;
       }
 
-      // Gentle pacing between batches
-      if (out.length < target) await sleep(1500);
+      if (out.length === before) {
+        noProgress++;
+        // If we keep hitting duplicates, gradually relax by widening request size & pacing.
+        if (noProgress >= 6) {
+          throw new Error(
+            `중복 문제로 인해 마지막 ${remain}개 생성이 계속 실패했습니다.\n\n` +
+            `해결: 문제 수를 10~20개로 낮춰 여러 번 생성/합치거나, 잠시 후 다시 시도해 주세요.`
+          );
+        }
+        // small pause to reduce rate-limit + give model time to diversify
+        await sleep(2500);
+      } else {
+        noProgress = 0;
+        // Gentle pacing between batches
+        if (out.length < target) await sleep(1500);
+      }
     }
 
     return out.slice(0, target);
