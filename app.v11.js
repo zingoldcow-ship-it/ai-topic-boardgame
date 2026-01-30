@@ -20,6 +20,35 @@
     rows: 6,
     learnerLevel: 'elem_high',
   };
+  // --- Model availability (Gemini API) --------------------------------------
+  async function listAvailableModels(apiKey) {
+    // models.list is available on v1beta
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const names = (data.models || []).map(m => m.name).filter(Boolean); // "models/gemini-2.0-flash"
+    return new Set(names.map(n => n.replace(/^models\//, '')));
+  }
+
+  function resolveModel(selected, availableSet) {
+    if (!availableSet || !(availableSet instanceof Set)) return selected;
+    if (availableSet.has(selected)) return selected;
+
+    const preferred = [
+      'gemini-2.0-flash',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash-lite',
+    ];
+    for (const m of preferred) if (availableSet.has(m)) return m;
+
+    for (const m of availableSet) if (m.includes('flash')) return m;
+
+    return Array.from(availableSet)[0] || selected;
+  }
+  // --------------------------------------------------------------------------
+
 
   // ---------- sound (WebAudio, no external files) ----------
   let audioCtx = null;
@@ -462,6 +491,7 @@ function extractObjectsFromText(text) {
 
   // ---------- state ----------
   const state = {
+    availableModels: null,
     started: false,
     turn: 0,
     pos: [0,0],
@@ -578,50 +608,7 @@ function extractObjectsFromText(text) {
   }
 
   // ---------- gemini (teacher) ----------
-  
-  // --- Gemini API caller (v1beta with fallback to v1) ------------------------
-  async function callGenerateContent({ apiKey, model, body }) {
-    const endpoints = [
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
-    ];
-
-    let lastText = '';
-    for (let i = 0; i < endpoints.length; i++) {
-      const url = endpoints[i];
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      // If model not found on v1beta, try v1.
-      if (res.ok) {
-        return { res, json: await res.json(), usedUrl: url };
-      }
-
-      // Capture error payload for decision making
-      const text = await (async()=>{ try { return await res.text(); } catch(_) { return ''; } })();
-      lastText = text;
-
-      // If 404 NOT_FOUND for v1beta, continue to v1. Otherwise throw now.
-      const isNotFound = res.status === 404 && (text.includes('NOT_FOUND') || text.includes('not found'));
-      if (isNotFound && i < endpoints.length - 1) continue;
-
-      // 429 handled by caller (existing logic), but we keep status and body
-      const err = new Error(`Gemini 오류: ${text || res.status}`);
-      err.status = res.status;
-      err.body = text;
-      throw err;
-    }
-
-    const err = new Error(`Gemini 오류: ${lastText || 'unknown'}`);
-    err.status = 0;
-    err.body = lastText;
-    throw err;
-  }
-  // --------------------------------------------------------------------------
-async function geminiGenerateDeck({topic, count, model, apiKey, qMode, learnerLevel}) {
+  async function geminiGenerateDeck({topic, count, model, apiKey, qMode, learnerLevel}) {
     learnerLevel = learnerLevel || DEFAULTS.learnerLevel;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const prompt = [
@@ -1135,6 +1122,17 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
       const aiCfg0 = getAiConfig() || {};
       const qMode = aiCfg0.qMode || (els.qMode?.value) || DEFAULTS.qMode;
       const learnerLevel = (getAiConfig()?.learnerLevel) || (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
+
+    // Load available model list once (best effort)
+    if (!state.availableModels) {
+      try { state.availableModels = await listAvailableModels(apiKey); } catch (_) { state.availableModels = null; }
+    }
+    const resolvedModel = resolveModel(model, state.availableModels);
+    if (resolvedModel && resolvedModel !== model) {
+      try { if (els.modelSel) els.modelSel.value = resolvedModel; } catch (_) {}
+      try { logLine(`ℹ️ 선택한 모델이 사용 불가하여 '${resolvedModel}'로 자동 전환했습니다.`); } catch (_) {}
+      model = resolvedModel;
+    }
       const deck = await geminiGenerateDeckBatched({ topic, count, model, apiKey, qMode, learnerLevel });
       const aiCfg = getAiConfig() || {};
       const pack = { version: 3, topic, createdAt: nowStamp(), model, settings: { showAnswer: aiCfg.showAnswer ?? true, qMode: aiCfg.qMode || DEFAULTS.qMode, activityMinutes: getConfiguredMinutes(), learnerLevel: (aiCfg.learnerLevel || DEFAULTS.learnerLevel) }, deck };
@@ -1196,10 +1194,21 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
   async function onTestAi() {
     const apiKey = getSavedKey().trim();
     if (!apiKey) { alert('API 키가 없습니다.'); return; }
-    const model = els.modelSel?.value || DEFAULTS.model;
+    let model = els.modelSel?.value || DEFAULTS.model;
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
+
+    // Load available model list once (best effort)
+    if (!state.availableModels) {
+      try { state.availableModels = await listAvailableModels(apiKey); } catch (_) { state.availableModels = null; }
+    }
+    const resolvedModel = resolveModel(model, state.availableModels);
+    if (resolvedModel && resolvedModel !== model) {
+      try { if (els.modelSel) els.modelSel.value = resolvedModel; } catch (_) {}
+      alert(`선택한 모델이 현재 API에서 사용 불가하여, 자동으로 \"${resolvedModel}\" 모델로 전환했습니다.`);
+      model = resolvedModel;
+    }
       // Auto-retry on 429 so teachers don't see confusing "first fail, second success"
       const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       let lastErr = null;
