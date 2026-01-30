@@ -1329,6 +1329,9 @@ if (MODE !== 'teacher') {
 
 
 
+
+
+
 // --- UX hotfix for Teacher Auth screen --------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   // 1) Add home icon to any button labeled '홈'
@@ -1338,12 +1341,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 2) Tint admin reset card background (by text match)
-  document.querySelectorAll('div').forEach(div => {
-    if (div.textContent && div.textContent.includes('관리자 초기화')) {
-      div.style.background = '#fff1f4';
-      div.style.borderRadius = '12px';
-    }
+  // 2) Tint ONLY the "관리자 초기화" card (not the whole auth screen)
+  // Find an element whose text is exactly "관리자 초기화" then style its closest card/container.
+  const resetLabelEls = Array.from(document.querySelectorAll('*')).filter(el => {
+    const t = (el.textContent || '').trim();
+    // Prefer headings/spans that are exactly the label
+    return t === '관리자 초기화' && el.children.length === 0;
   });
+
+  if (resetLabelEls.length) {
+    const labelEl = resetLabelEls[0];
+    // Try to find a nearby container that looks like a card (div/section with border)
+    let card = labelEl.closest('section, div, article');
+    // Walk up a bit to find the most specific container that doesn't include the whole page
+    let steps = 0;
+    while (card && steps < 4) {
+      const rect = card.getBoundingClientRect();
+      // Avoid huge containers (like the whole modal/page)
+      if (rect.width < window.innerWidth * 0.95 && rect.height < window.innerHeight * 0.7) break;
+      card = card.parentElement?.closest('section, div, article');
+      steps++;
+    }
+    if (card) {
+      card.style.background = '#fff1f4';
+      card.style.borderRadius = '12px';
+    }
+  }
 });
 // ---------------------------------------------------------------------------
