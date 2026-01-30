@@ -1335,8 +1335,11 @@ body[data-mode="landing"] .usageCard .usageDesc{
   margin-left:2px;
 }
 
-/* UX tweak: single-line compact notice for '문제 파일이 없습니다' */
-.notice-no-file, .no-question-file, .file-empty-notice {
-  font-size: 12px !important;
+/* Compact single-line notice */
+.notice-no-file{
+  font-size: 12px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
