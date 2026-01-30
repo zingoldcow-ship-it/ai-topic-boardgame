@@ -1334,12 +1334,3 @@ body[data-mode="landing"] .usageCard .usageRow{
 body[data-mode="landing"] .usageCard .usageDesc{
   margin-left:2px;
 }
-
-/* Compact single-line notice */
-.notice-no-file{
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
-}

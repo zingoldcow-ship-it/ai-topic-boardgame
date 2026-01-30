@@ -1112,7 +1112,8 @@ const showBoardBanner = (mainText, subText = '', ms = 1200) => {
     if (!apiKey) { alert('Gemini API 키가 필요합니다. [설정]에서 API 키를 저장한 뒤 다시 시도하세요.'); refreshSetupHint(); return; }
 
     const cfg = getAiConfig();
-const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
+    const model = els.modelSel?.value || cfg.model;
+    const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
 
     els.applyTopic.disabled = true;
     els.applyTopic.textContent = '생성 중...';
@@ -1165,7 +1166,8 @@ const count = clamp(Number(els.deckCount?.value || cfg.deckCount), 6, 200);
   }
 
   function onSaveAi() {
-const qMode = els.qMode?.value || DEFAULTS.qMode;
+    const model = els.modelSel?.value || DEFAULTS.model;
+    const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
     const showAnswer = !!(els.showAnswer?.checked);
     const deckCount = clamp(Number(els.deckCount?.value || DEFAULTS.deckCount), 6, 200);
@@ -1193,7 +1195,6 @@ const qMode = els.qMode?.value || DEFAULTS.qMode;
     const apiKey = getSavedKey().trim();
     if (!apiKey) { alert('API 키가 없습니다.'); return; }
     let model = els.modelSel?.value || DEFAULTS.model;
-    let switchNote = '';
     try {
       const qMode = els.qMode?.value || DEFAULTS.qMode;
     const learnerLevel = (document.querySelector('input[name="learnerLevel"]:checked')?.value) || DEFAULTS.learnerLevel;
@@ -1205,9 +1206,7 @@ const qMode = els.qMode?.value || DEFAULTS.qMode;
     const resolvedModel = resolveModel(model, state.availableModels);
     if (resolvedModel && resolvedModel !== model) {
       try { if (els.modelSel) els.modelSel.value = resolvedModel; } catch (_) {}
-      switchNote = `
-
-(안내) 선택한 모델 "${model}"은 현재 API에서 사용 불가/미지원이라, "${resolvedModel}"로 자동 전환해 계속 진행했습니다.`;
+      alert(`선택한 모델이 현재 API에서 사용 불가하여, 자동으로 \"${resolvedModel}\" 모델로 전환했습니다.`);
       model = resolvedModel;
     }
       // Auto-retry on 429 so teachers don't see confusing "first fail, second success"
@@ -1229,7 +1228,7 @@ const qMode = els.qMode?.value || DEFAULTS.qMode;
         }
       }
       if (lastErr) throw lastErr;
-      alert(`연결 성공!${switchNote}\n\n[현재 설정]\n모델: ${model}\n문항유형: ${qMode}\n학습자수준: ${learnerLevel}`);
+      alert(`연결 성공!\n\n[현재 설정]\n모델: ${model}\n문항유형: ${qMode}\n학습자수준: ${learnerLevel}`);
     } catch (e) {
       alert(String(e?.message || e));
     }
